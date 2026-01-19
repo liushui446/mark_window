@@ -1,1 +1,0 @@
-﻿SM_EXPORTS void print();

@@ -25,6 +25,7 @@
 #include <QStringListModel> 
 #include "selectablegraphicsview.h"
 #include <algorithm/NccMatchDll.h>
+#include"core/core.hpp"
 //#include <algorithm/src/markInterface.h>
 namespace fs = std::filesystem;
 #ifndef M_PI
@@ -1021,7 +1022,7 @@ void MainWindow::on_pushButton_2_clicked()
                 .arg(time_ms, 0, 'f', 3));
 
             // 绘制特征点（使用相对路径）
-            QVector<QPointF> features;
+            /*QVector<QPointF> features;
             QString filePath = "template_features.txt";
             QFile file(filePath);
             if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -1040,9 +1041,10 @@ void MainWindow::on_pushButton_2_clicked()
                     }
                 }
                 file.close();
-            }
+            }*/
             //offset_r -= threshold - 6;
-            drawFeatureTrajectory(features, offset_x, offset_y, -offset_r, Qt::red);
+            //drawFeatureTrajectory(features, offset_x, offset_y, -offset_r, Qt::red);
+            drawFeatureTrajectory(offset_x, offset_y, -offset_r, Qt::red);
 
         }
         else {
@@ -1546,6 +1548,38 @@ void MainWindow::drawFeatureTrajectory1(const QVector<QPointF>& features, double
             Qt::NoPen, QBrush(color)
         );
         trajectoryItems.append(ellipse);
+    }
+}
+void MainWindow::drawFeatureTrajectory( double match_x, double match_y, double angle_deg, const QColor& color)
+{
+    if (!scene) return;
+
+    double anglerad = angle_deg * M_PI / 180.0; // 注意 M_PI 要 include <cmath>
+    double cos_r = cos(anglerad);
+    double sin_r = sin(anglerad);
+
+    QVector<QPointF> points;
+    sm::Core* core = sm::Core::get_init();
+    for (const auto& feature : core->temp_features) {
+        double x = feature.x * cos_r - feature.y * sin_r + match_x + 0.5;
+        double y = feature.x * sin_r + feature.y * cos_r + match_y + 0.5;
+        points.append(QPointF(x, y));
+    }
+
+    QPen pen(color, 1);
+
+    //// 连线绘制
+    //for (int i = 0; i < points.size() - 1; ++i) {
+    //    scene->addLine(points[i].x(), points[i].y(), points[i + 1].x(), points[i + 1].y(), pen);
+    //}
+    if (points.size() < 3) return; // 少于3个点无法形成轮廓
+
+    double radius = 0.5;
+    // 画点
+    for (const auto& pt : points) {
+        scene2->addEllipse(pt.x() - radius, pt.y() - radius,
+            radius * 2, radius * 2,
+            Qt::NoPen, QBrush(color));
     }
 }
 // 重写事件过滤器

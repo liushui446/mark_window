@@ -79,6 +79,8 @@ private:
    MatchData loadMatchesFromXml(const std::string& filePath);
    void drawFeatureTrajectory1(const QVector<QPointF>& features, double match_x, double match_y, double angle_deg, const QColor& color = Qt::red);
     void drawFeatureTrajectory(const QVector<QPointF>& features, double match_x, double match_y, double angle_deg, const QColor& color = Qt::red);
+    //获取全局的点集
+    void MainWindow::drawFeatureTrajectory(double match_x, double match_y, double angle_deg, const QColor& color);
     void loadAndDrawFeatureTrajectory(const QString& xmlFilePath, const QColor& color);
     QVector<QColor> colorTable = { Qt::red, Qt::green, Qt::blue, Qt::yellow, Qt::magenta };
     QPixmap originalPixmap;  // 原图

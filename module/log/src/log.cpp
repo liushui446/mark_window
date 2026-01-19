@@ -5,6 +5,7 @@
 #include <fstream>
 std::ofstream output;
 sm::Write_Log* m_log;
+
 namespace sm {
     
     Write_Log::Write_Log()

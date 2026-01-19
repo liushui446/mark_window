@@ -6,6 +6,7 @@
 #include <memory>
 #include <opencv2/core/ocl.hpp>
 #include "MarkTeach.h"
+
 // 静态全局变量存储参数和匹配器实例
 static double g_cannyThresh1 = 170;
 static double g_cannyThresh2 = 200;
@@ -140,7 +141,6 @@ NCC_MATCH_API bool NCC_CreateTemplate(
         }
 
         // 7. 输出成功信息
-        std::cout << "边缘点已保存到: " << edgeXmlPath << std::endl;
         return true;
     }
     catch (const std::exception& e) {

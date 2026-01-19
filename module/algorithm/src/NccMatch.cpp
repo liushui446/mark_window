@@ -6,8 +6,10 @@
 #include <opencv2/imgproc/imgproc.hpp>  // 通常和图像处理函数一起包含
 #include "StegerSubpixel.h"
 #include "icp.h"
+#include "core/core.hpp"
 
-#define DRAW_MATCH_EDGE 0
+
+#define DRAW_MATCH_EDGE 1
 #define CV_PI_RAD (CV_PI / 180.0f)
 NccMatch::NccMatch(int angleStep, int minAngle, int maxAngle,
     double cannyThresh1, double cannyThresh2,
@@ -35,18 +37,15 @@ void NccMatch::setContourAreaThreshold(double threshold) {
 }
 
 bool NccMatch::extractEdgePoints(const cv::Mat& grayImage, std::vector<cv::Point>& edgePoints) {
-    if (grayImage.empty() || grayImage.type() != CV_8UC1) {
-        std::cerr << "输入图像必须是非空灰度图" << std::endl;
-        return false;
-    }
-
     // 边缘检测
     cv::Mat edges;
     //cv::Canny(grayImage, edges, cannyThresh1_, cannyThresh2_, cannyApertureSize_, cannyL2gradient_);
     cv::Canny(grayImage, edges, 190, 230, 3, true);
     lastEdgeImage_ = edges.clone();
     int area = 20;
-    extractEdgePointsWithNoiseFilter(edges, edgePoints,area);
+    bool has_no_edge = (countNonZero(edges) == 0);
+    if (has_no_edge==0)
+        extractEdgePointsWithNoiseFilter(edges, edgePoints, area);
     if (edgePoints.empty())
     {
         // 图像预处理增强
@@ -64,8 +63,8 @@ bool NccMatch::extractEdgePoints(const cv::Mat& grayImage, std::vector<cv::Point
        area = 250;
         extractEdgePointsWithNoiseFilter(edges2, edgePoints, area);
     }
-    if(edgePoints.size()>2000)
-        edgePoints = sparseEdgePointsSimple(edgePoints, 4.0f);
+    if(edgePoints.size()>5000)
+        edgePoints = sparseEdgePointsSimple(edgePoints, 3.0f);
     //// 提取轮廓并过滤小面积轮廓
     //std::vector<std::vector<cv::Point>> contours;
     //cv::findContours(edges, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
@@ -500,15 +499,28 @@ bool NccMatch::generateTemplates1(const std::vector<cv::Point>& edgePoints,
         baseTemp.ptr<uchar>(p.y)[p.x] = 255;
     }
 
-    // 保存特征点（只在需要时）
-    std::ofstream outFile("template_features.txt");
-    if (outFile.is_open()) {
-        for (const auto& subPt : baseSubedgePoints) {
-            outFile << (subPt.x - cx+0.5) << " " << (subPt.y - cy+0.5) << "\n";
-        }
-        outFile.close();
-    }
+    //// 保存特征点（只在需要时）
+    //std::ofstream outFile("template_features.txt");
+    //if (outFile.is_open()) {
+    //    for (const auto& subPt : baseSubedgePoints) {
+    //        outFile << (subPt.x - cx+0.5) << " " << (subPt.y - cy+0.5) << "\n";
+    //    }
+    //    outFile.close();
+    //}
+    
+    //sm::Core::get_init();
+    
+    sm::Core* core = sm::Core::get_init();
+    // 2. 清空 temp_features（如果需要）
+    core->temp_features.clear();
 
+    // 3. 将点存入 temp_features
+    for (const auto& subPt : baseSubedgePoints) {
+        Point_f pt;
+        pt.x = subPt.x - cx + 0.5;
+        pt.y = subPt.y - cy + 0.5;
+        core->temp_features.push_back(pt);
+    }
     // -------------------------- 步骤2：预计算压缩模板 --------------------------
     cv::Point2f baseCenter(baseBbox_.x + baseBbox_.width * 0.5f,
         baseBbox_.y + baseBbox_.height * 0.5f);
@@ -1006,10 +1018,7 @@ bool NccMatch::bestTemplate(const std::vector<cv::Mat>& image, const int& method
     return true;
 }
 bool NccMatch::matchAngleTemplate(const cv::Mat& grayImage, std::vector<cv::Mat>& results) {
-    if (grayImage.empty() || grayImage.type() != CV_8UC1) {
-        std::cerr << "输入图像必须是非空灰度图" << std::endl;
-        return false;
-    }
+    
     if (fourierTemplates_.empty()) {
         std::cerr << "未生成模板，请先调用生成模板方法" << std::endl;
         return false;
@@ -1154,10 +1163,6 @@ bool  NccMatch::matchLocation(cv::Mat& image, const int& method, std::vector<std
 }
 // 实现从XML加载边缘点并生成模板的方法
 bool NccMatch::loadEdgePointsAndGenerateTemplates(const std::string& edgeXmlPath, const cv::Mat& Image) {
-    // 1. 校验XML路径
-    if (edgeXmlPath.empty()) {
-        return false;
-    }
 
     // 2. 从XML加载边缘点
     std::vector<cv::Point> edgePoints;
@@ -1218,9 +1223,7 @@ bool NccMatch::runFullMatchingFromPath(
         // 3. 读取待匹配图像并转换为灰度图
        // cv::Mat testImg = cv::imread(testImagePath);
         cv::Mat testImg = grayImage.clone();
-        if (testImg.empty()) {
-            return false;
-        }
+       
         cv::Mat testGray;
         if (testImg.channels() == 3) {
             cv::cvtColor(testImg, testGray, cv::COLOR_BGR2GRAY);
@@ -1542,12 +1545,9 @@ double NccMatch::processWithoutIPP(const cv::Mat& input, cv::Mat& output) {
 //从边缘图像中提取非杂点边缘点（3x3邻域过滤）
 void NccMatch::extractEdgePointsWithNoiseFilter(const cv::Mat& edgeImage, std::vector<cv::Point>& edgePoints,const int& minArea) {
     edgePoints.clear(); // 确保容器为空
-    if (edgeImage.empty() || edgeImage.type() != CV_8UC1) {
-        return; // 输入边缘图无效则直接返回
-    }
     // 连通域分析：过滤面积过小的杂点（基于开运算后的图像）
     cv::Mat labels, stats, centroids;
-    // 注意：使用openedEdges而非原始edges，减少无效连通域计算
+    
     int numLabels = cv::connectedComponentsWithStats(edgeImage, labels, stats, centroids, 8);
 
     // 过滤小连通域（设定面积阈值，根据实际场景调整）

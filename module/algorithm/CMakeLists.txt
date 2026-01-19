@@ -1,5 +1,6 @@
 ﻿# Set the project name
 project (algorithm)
+
 find_package(
 	OpenCV
 	REQUIRED
@@ -13,12 +14,17 @@ file(GLOB SRC_FILES src/*.cpp)
 # 添加库
 add_library(${PROJECT_NAME} SHARED ${SRC_FILES})
 add_library(sub::algorithm ALIAS ${PROJECT_NAME})
-
 target_include_directories( ${PROJECT_NAME}
-    PUBLIC ${PROJECT_SOURCE_DIR}/include ${OpenCV_INCLUDE_DIRS}
+    PUBLIC ${PROJECT_SOURCE_DIR}/include
 )
+
 # 链接 OpenCV 库
-target_link_libraries( ${PROJECT_NAME} ${OpenCV_LIBS} Eigen3::Eigen)
+target_link_libraries(${PROJECT_NAME}
+   ${OpenCV_LIBS}
+    Eigen3::Eigen
+    sub::core
+)
+
 # 查找 Eigen3
 # 打印库信息
 if(Eigen3_FOUND)

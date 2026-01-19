@@ -16,7 +16,11 @@ target_include_directories( ${PROJECT_NAME}
     PUBLIC ${PROJECT_SOURCE_DIR}/include ${OpenCV_INCLUDE_DIRS}
 )
 # 链接 OpenCV 库
-target_link_libraries( ${PROJECT_NAME} ${OpenCV_LIBS} )
+target_link_libraries( ${PROJECT_NAME} 
+${OpenCV_LIBS}
+sub::core
+)
+
 # 查找 Eigen3
 # 打印库信息
 

@@ -9,4 +9,5 @@ target_link_libraries(${PROJECT_NAME}
     sub::qtgui
     sub::algorithm
     sub::AutoFoucs
+    sub::core
 )
