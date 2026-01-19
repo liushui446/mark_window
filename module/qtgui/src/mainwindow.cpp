@@ -561,7 +561,8 @@ void MainWindow::on_pushButton_5_clicked()
     qint64 startTime = QDateTime::currentMSecsSinceEpoch();
 
     // 原图转换成 BGR 图像（cv::Mat）
-    QImage image = originalPixmap.toImage().convertToFormat(QImage::Format_BGR888);
+    //QImage image = originalPixmap.toImage().convertToFormat(QImage::Format_RGB888);
+    QImage image = originalPixmap.toImage().convertToFormat(QImage::Format_RGB888);
     cv::Mat mat(image.height(), image.width(), CV_8UC3, (void*)image.bits(), image.bytesPerLine());
     if (mat.empty()) {
         QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("图像转换失败！"));
@@ -914,7 +915,7 @@ void MainWindow::on_pushButton_2_clicked()
         }
 
         // 转换图像为OpenCV格式
-        QImage image = originalPixmap2.toImage().convertToFormat(QImage::Format_BGR888);
+        QImage image = originalPixmap2.toImage().convertToFormat(QImage::Format_RGB888);
         cv::Mat mat(image.height(), image.width(), CV_8UC3, (void*)image.bits(), image.bytesPerLine());
         if (mat.empty()) {
             QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("图像转换失败！"));
@@ -1101,7 +1102,7 @@ void MainWindow::on_pushButton_9_clicked()
             }
 
             // 转换为 Mat
-            QImage formatted = image.convertToFormat(QImage::Format_BGR888);
+            QImage formatted = image.convertToFormat(QImage::Format_RGB888);
             cv::Mat mat(formatted.height(), formatted.width(), CV_8UC3, (void*)formatted.bits(), formatted.bytesPerLine());
 
             double score = ComputerTenengrad(mat);
@@ -1124,7 +1125,7 @@ void MainWindow::on_pushButton_9_clicked()
             return;
         }
 
-        QImage image = originalPixmap.toImage().convertToFormat(QImage::Format_BGR888);
+        QImage image = originalPixmap.toImage().convertToFormat(QImage::Format_RGB888);
         cv::Mat mat(image.height(), image.width(), CV_8UC3, (void*)image.bits(), image.bytesPerLine());
 
         double score = ComputerTenengrad(mat);
@@ -1158,7 +1159,7 @@ void MainWindow::on_pushButton_10_clicked()
     }
 
     // 3. 图像格式转换（仅转换一次，提升效率）
-    QImage image = originalPixmap.toImage().convertToFormat(QImage::Format_BGR888);
+    QImage image = originalPixmap.toImage().convertToFormat(QImage::Format_RGB888);
     cv::Mat mat(image.height(), image.width(), CV_8UC3,
         (void*)image.bits(), image.bytesPerLine());
 
@@ -1286,7 +1287,7 @@ void MainWindow::on_pushButton_11_clicked()
     }
 
     // 3. 图像格式转换并保存临时文件
-    QImage image = originalPixmap2.toImage().convertToFormat(QImage::Format_BGR888);
+    QImage image = originalPixmap2.toImage().convertToFormat(QImage::Format_RGB888);
     cv::Mat mat(image.height(), image.width(), CV_8UC3,
         (void*)image.bits(), image.bytesPerLine());
     if (mat.empty()) {
@@ -1752,7 +1753,7 @@ void MainWindow::wheelEvent(QWheelEvent* event)
 {
     const double zoomStep = 1.15;
 
-    QPoint globalPos = event->globalPosition().toPoint();  // 全局位置（Qt6 用 globalPosition；Qt5 用 globalPos）
+    QPoint globalPos = QPoint(event->globalPos().x(), event->globalPos().y());  // 全局位置（Qt6 用 globalPosition；Qt5 用 globalPos）
 
     // 将全局坐标映射到 graphicsView 和 graphicsView_2 的局部坐标
     QPoint posInView1 = ui->graphicsView->mapFromGlobal(globalPos);
