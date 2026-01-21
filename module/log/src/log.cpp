@@ -1,7 +1,7 @@
 ﻿#include <iostream>
 #include <QString>
 #include <QDateTime>
-#include"log/log.hpp"
+#include "log/log.hpp"
 #include <fstream>
 std::ofstream output;
 sm::Write_Log* m_log;

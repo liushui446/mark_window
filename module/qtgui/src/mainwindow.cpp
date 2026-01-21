@@ -19,13 +19,14 @@
 #include <filesystem>  // C++17的文件系统支持
 #include <opencv2/opencv.hpp>
 #include <QTime>
-#include<algorithm/markInterface.h>
+#include <algorithm/markInterface.h>
 #include <QMessageBox>
-#include<AutoFoucs/Foucs.h>
+#include <AutoFoucs/Foucs.h>
 #include <QStringListModel> 
 #include "selectablegraphicsview.h"
 #include <algorithm/NccMatchDll.h>
-#include"core/core.hpp"
+#include "core/core.hpp"
+//#include "camera.hpp"
 //#include <algorithm/src/markInterface.h>
 namespace fs = std::filesystem;
 #ifndef M_PI
@@ -90,6 +91,9 @@ MainWindow::MainWindow(QWidget* parent)
 
     // 连接按钮信号槽
     connect(ui->pushButton_6, &QPushButton::clicked, this, &MainWindow::on_loadFeatureButton_clicked);
+
+    connect(ui->pushButton_7, &QPushButton::clicked, this, &MainWindow::on_loadFeatureButton_clicked);
+
     // 为graphicsView的视口安装事件过滤器
     ui->graphicsView->viewport()->installEventFilter(this);
 
@@ -1787,4 +1791,9 @@ void MainWindow::mousePressEvent(QMouseEvent* event)
     QPointF scenePos = ui->graphicsView->mapToScene(event->pos());
     qDebug() << "点击位置：" << scenePos;
     QMainWindow::mousePressEvent(event);
+}
+
+void MainWindow::on_Camera_test()
+{
+    //sm::camera::CameraManager::GetInstance().UseBaslerCam();
 }

@@ -52,6 +52,8 @@ private slots:
     void onFirstViewMenuAction(const QString& action);  // 第一个视图的菜单动作
     void onSecondViewMenuAction(const QString& action); // 第二个视图的菜单动作
 
+    void on_Camera_test();
+
 private:
     Ui::MainWindow* ui;
     QGraphicsScene* scene = nullptr;
