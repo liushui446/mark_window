@@ -26,12 +26,44 @@
 #include "selectablegraphicsview.h"
 #include <algorithm/NccMatchDll.h>
 #include "core/core.hpp"
+#include "../../camera/include/camera/camera.hpp"
+
+
+#include <stdio.h>
+#include <Windows.h>
+#include <conio.h>
+#include <iostream>
+#include <string>
+#include <iostream>
+#include <filesystem>
+
+// Include files to use OpenCV API.
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/opencv.hpp>
+// Include files to use the PYLON API.
+#include <pylon/PylonIncludes.h>
+#include <pylon/usb/BaslerUsbInstantCamera.h>
+
+
+
+//#include "camera/camera.hpp"
+//#include <Windows.h>  // 包含 SetThreadDescription 所需的声明
+
 //#include "camera.hpp"
 //#include <algorithm/src/markInterface.h>
+
 namespace fs = std::filesystem;
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
+
+using namespace std;
+using namespace sm;
+
+using namespace Pylon;
+using namespace GenApi;
+using namespace cv;
 
 
 //MainWindow::MainWindow(QWidget* parent)
@@ -89,10 +121,15 @@ MainWindow::MainWindow(QWidget* parent)
 {
     ui->setupUi(this);
 
+    /*std::thread outputExeclThread(&sm::CameraManager::UseBaslerCam, &sm::CameraManager::GetInstance());
+    SetThreadDescription(outputExeclThread.native_handle(), L"outputExeclThread");
+    outputExeclThread.detach();*/
+
+    //CameraManager::GetInstance().UseBaslerCam();
     // 连接按钮信号槽
     connect(ui->pushButton_6, &QPushButton::clicked, this, &MainWindow::on_loadFeatureButton_clicked);
 
-    connect(ui->pushButton_7, &QPushButton::clicked, this, &MainWindow::on_loadFeatureButton_clicked);
+    connect(ui->pushButton_7, &QPushButton::clicked, this, &MainWindow::on_Camera_test);
 
     // 为graphicsView的视口安装事件过滤器
     ui->graphicsView->viewport()->installEventFilter(this);
@@ -477,14 +514,14 @@ QPixmap MainWindow::generateBinaryPixmap(const QPixmap& pixmap)
     // 计算 ROI 以中心为点，宽高减去 offset
     int centerX = mat.cols / 2;
     int centerY = mat.rows / 2;
-    int halfWidth = std::max((mat.cols - offset) / 2, 0);
-    int halfHeight = std::max((mat.rows - offset) / 2, 0);
+    int halfWidth = max((mat.cols - offset) / 2, 0);
+    int halfHeight = max((mat.rows - offset) / 2, 0);
     // 选择较小的半边长作为正方形 ROI 的半边长
-    int halfSize = std::min(halfWidth, halfHeight);
-    int x = std::max(centerX - halfSize, 0);
-    int y = std::max(centerY - halfSize, 0);
+    int halfSize = min(halfWidth, halfHeight);
+    int x = max(centerX - halfSize, 0);
+    int y = max(centerY - halfSize, 0);
     // 调整半边长以确保 ROI 不超出图像边界
-    halfSize = std::min({ halfSize, mat.cols - x, mat.rows - y });
+    halfSize = min(halfSize, mat.cols - x, mat.rows - y);
 
     if (halfSize <= 0 ) {
         // ROI无效，直接整体二值化或返回原图
@@ -634,13 +671,13 @@ void MainWindow::on_pushButton_5_clicked()
         // 计算最大可能的正方形半边长（考虑偏移和边界）
         int maxHalfWidth = (mat.cols - offset) / 2;
         int maxHalfHeight = (mat.rows - offset) / 2;
-        int halfSize = std::min(maxHalfWidth, maxHalfHeight);
-        halfSize = std::max(halfSize, 50);  // 最小半边长限制（避免过小ROI）
+        int halfSize = min(maxHalfWidth, maxHalfHeight);
+        halfSize = max(halfSize, 50);  // 最小半边长限制（避免过小ROI）
 
         // 计算ROI坐标（确保不超出边界）
-        int x = std::max(0, centerX - halfSize);
-        int y = std::max(0, centerY - halfSize);
-        int size = std::min(2 * halfSize, std::min(mat.cols - x, mat.rows - y));  // 最终边长
+        int x = max(0, centerX - halfSize);
+        int y = max(0, centerY - halfSize);
+        int size = min(2 * halfSize, min(mat.cols - x, mat.rows - y));  // 最终边长
 
         // 赋值给自定义ROI结构体
         roi.x = x;
@@ -818,14 +855,14 @@ void MainWindow::on_pushButton_2_clicked()
                 // 2. 无选中区域，使用默认正方形ROI计算
                 int centerX = mat.cols / 2;
                 int centerY = mat.rows / 2;
-                int halfWidth = std::max((mat.cols - offset) / 2, 0);
-                int halfHeight = std::max((mat.rows - offset) / 2, 0);
-                int halfSize = std::min(halfWidth, halfHeight);
-                halfSize = std::max(halfSize, 50);  // 最小半边长限制
+                int halfWidth = max((mat.cols - offset) / 2, 0);
+                int halfHeight = max((mat.rows - offset) / 2, 0);
+                int halfSize = min(halfWidth, halfHeight);
+                halfSize = max(halfSize, 50);  // 最小半边长限制
 
-                int x = std::max(centerX - halfSize, 0);
-                int y = std::max(centerY - halfSize, 0);
-                int size = std::min(2 * halfSize, std::min(mat.cols - x, mat.rows - y));  // 最终边长
+                int x = max(centerX - halfSize, 0);
+                int y = max(centerY - halfSize, 0);
+                int size = min(2 * halfSize, min(mat.cols - x, mat.rows - y));  // 最终边长
 
                 // 赋值给自定义ROI
                 roi.x = x;
@@ -958,14 +995,14 @@ void MainWindow::on_pushButton_2_clicked()
             // 2. 无选中区域，使用默认计算
             int centerX = mat.cols / 2;
             int centerY = mat.rows / 2;
-            int halfWidth = std::max((mat.cols - offset) / 2, 0);
-            int halfHeight = std::max((mat.rows - offset) / 2, 0);
-            int halfSize = std::min(halfWidth, halfHeight);
-            halfSize = std::max(halfSize, 50);  // 最小半边长
+            int halfWidth = max((mat.cols - offset) / 2, 0);
+            int halfHeight = max((mat.rows - offset) / 2, 0);
+            int halfSize = min(halfWidth, halfHeight);
+            halfSize = max(halfSize, 50);  // 最小半边长
 
-            int x = std::max(centerX - halfSize, 0);
-            int y = std::max(centerY - halfSize, 0);
-            int size = std::min(2 * halfSize, std::min(mat.cols - x, mat.rows - y));
+            int x = max(centerX - halfSize, 0);
+            int y = max(centerY - halfSize, 0);
+            int size = min(2 * halfSize, min(mat.cols - x, mat.rows - y));
 
             roi.x = x;
             roi.y = y;
@@ -1337,14 +1374,14 @@ void MainWindow::on_pushButton_11_clicked()
         // 无选中区域时使用默认正方形ROI计算
         int centerX = mat.cols / 2;
         int centerY = mat.rows / 2;
-        int halfWidth = std::max((mat.cols - offset) / 2, 0);
-        int halfHeight = std::max((mat.rows - offset) / 2, 0);
-        int halfSize = std::min(halfWidth, halfHeight);
-        halfSize = std::max(halfSize, 50);  // 最小半边长限制（确保有效区域）
+        int halfWidth = max((mat.cols - offset) / 2, 0);
+        int halfHeight = max((mat.rows - offset) / 2, 0);
+        int halfSize = min(halfWidth, halfHeight);
+        halfSize = max(halfSize, 50);  // 最小半边长限制（确保有效区域）
 
-        int x = std::max(centerX - halfSize, 0);
-        int y = std::max(centerY - halfSize, 0);
-        int size = std::min(2 * halfSize, std::min(mat.cols - x, mat.rows - y));
+        int x = max(centerX - halfSize, 0);
+        int y = max(centerY - halfSize, 0);
+        int size = min(2 * halfSize, min(mat.cols - x, mat.rows - y));
 
         // 赋值给自定义ROI结构体
         roi.x = x;
@@ -1795,5 +1832,19 @@ void MainWindow::mousePressEvent(QMouseEvent* event)
 
 void MainWindow::on_Camera_test()
 {
-    //sm::camera::CameraManager::GetInstance().UseBaslerCam();
+    
+}
+
+void MainWindow::SearchAndConnectCamera()
+{
+    CTlFactory& tlFactory = CTlFactory::GetInstance();
+    DeviceInfoList_t devices;
+    tlFactory.EnumerateDevices(devices); // 枚举设备
+
+    if (devices.empty()) {
+        throw RUNTIME_EXCEPTION("No camera found.");
+    }
+
+    CInstantCamera camera(tlFactory.CreateDevice(devices[0]));
+    camera.Open(); // 连接首台相机
 }

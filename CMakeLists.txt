@@ -10,6 +10,31 @@ IF (WIN32)
 ELSEIF (UNIX)
  ADD_DEFINITIONS(-D Linux)
 ENDIF ()
+
+# ===================== 核心：全局定义 Windows 架构宏 =====================
+if(WIN32)
+    # 方式1：自动检测架构（推荐，适配 32/64 位）
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        # 64位 Windows：全局定义 _M_X64
+        add_compile_definitions(_M_X64)
+        message(STATUS "Windows 64位架构：已全局定义 _M_X64")
+    elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
+        # 32位 Windows：全局定义 _M_IX86
+        add_compile_definitions(_M_IX86)
+        message(STATUS "Windows 32位架构：已全局定义 _M_IX86")
+    else()
+        message(FATAL_ERROR "无法检测 Windows 目标架构！")
+    endif()
+	
+	# 2. 定义 Windows 版本宏（兼容 Windows 10/11）
+    # _WIN32_WINNT_WIN10 = 0x0A00，对应 Windows 10
+    add_compile_definitions(
+        _WIN32_WINNT=0x0A00
+        NTDDI_VERSION=0x0A000006
+        WIN32_LEAN_AND_MEAN  # 精简 Windows 头文件，减少冲突
+    )
+endif()
+
 # 设置输出目录
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -26,3 +51,4 @@ add_subdirectory(module/log)
 add_subdirectory(module/algorithm)
 add_subdirectory(module/AutoFoucs)
 add_subdirectory(module/camera)
+add_subdirectory(module/process)
