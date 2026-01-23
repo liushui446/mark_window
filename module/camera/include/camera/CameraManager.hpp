@@ -18,7 +18,7 @@ namespace sm {
 		//********** Basler *********//
 	};
 
-	class CameraManager
+	class SM_EXPORTS CameraManager
 	{
 	public:
 		static CameraManager& GetInstance();//单例
@@ -33,6 +33,9 @@ namespace sm {
 
 		//存图
 		int SaveImage(ImageType enSaveImageType, CameraID id);
+
+		//获取相机参数
+		int GetParaInt(CameraID id, CameraParameter parm);
 
 		//获取图像数据
 		int GetCameraData(CameraID id, unsigned char* data);

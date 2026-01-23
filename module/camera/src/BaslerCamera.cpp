@@ -1,5 +1,8 @@
 #include "camera/BaslerCamera.hpp"
 
+#include <pylon/PylonIncludes.h>
+#include <pylon/usb/BaslerUsbInstantCamera.h>
+
 namespace sm
 {
 	BaslerCamera::BaslerCamera()
@@ -28,7 +31,23 @@ namespace sm
 
 	int BaslerCamera::GetCameraData(unsigned char* data)
 	{
+
 		return 0;
+	}
+
+	int BaslerCamera::GetCameraParaInt(CameraParameter para) {
+		switch (para) {
+		case CameraParameter::CAMERA_PARA_HEIGHT:
+			return pBaslerMember->camerainfo.height;
+		case CameraParameter::CAMERA_PARA_WIDTH:
+			return pBaslerMember->camerainfo.width;
+		case CameraParameter::CAMERA_PARA_SIZE:
+			return pBaslerMember->camerainfo.ImageSize;
+		case CameraParameter::CAMERA_CHANNEL:
+			return pBaslerMember->camerainfo.channels;
+		default:
+			return 0;
+		}
 	}
 
 	int BaslerCamera::SaveImage(ImageType imagetype)

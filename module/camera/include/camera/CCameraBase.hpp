@@ -55,6 +55,7 @@ namespace sm {
 
 		//配置相机初始化参数
 		//virtual int SetParameters() = 0;
+		virtual int GetCameraParaInt(CameraParameter para) = 0;
 
 		//关闭设备
 		virtual int CloseDevice() = 0;

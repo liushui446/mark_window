@@ -1,7 +1,8 @@
 ﻿#ifndef COMMONCORE_HPP
 #define COMMONCORE_HPP
 
-#include"core/std.hpp"
+#include "core/std.hpp"
+#include "core/ErrCode.hpp"
 
 #include <iostream>
 #include <string>

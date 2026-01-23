@@ -54,7 +54,7 @@ endif()
 add_library(pylon::Headers INTERFACE IMPORTED)
 
 set_target_properties(pylon::Headers PROPERTIES
-  INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/Development/include"
+  INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/Basler/include"
 )
 
 # Create imported target pylon::PylonBase

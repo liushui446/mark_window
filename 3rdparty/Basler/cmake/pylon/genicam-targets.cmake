@@ -56,7 +56,7 @@ endif()
 add_library(GenICam::Headers INTERFACE IMPORTED)
 
 set_target_properties(GenICam::Headers PROPERTIES
-  INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/Development/include"
+  INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/Basler/include"
 )
 
 # Create imported target GenICam::GCBase
@@ -64,11 +64,11 @@ add_library(GenICam::GCBase SHARED IMPORTED)
 
 set_target_properties(GenICam::GCBase PROPERTIES
   INTERFACE_LINK_LIBRARIES "GenICam::Headers"
-  IMPORTED_IMPLIB "${_IMPORT_PREFIX}/Development/lib/x64/GCBase_MD_VC141_v3_1_Basler_pylon_v3.lib"
+  IMPORTED_IMPLIB "${_IMPORT_PREFIX}/Basler/lib/x64/GCBase_MD_VC141_v3_1_Basler_pylon_v3.lib"
 )
 
 list(APPEND _IMPORT_CHECK_TARGETS GenICam::GCBase )
-list(APPEND _IMPORT_CHECK_FILES_FOR_GenICam::GCBase "${_IMPORT_PREFIX}/Development/lib/x64/GCBase_MD_VC141_v3_1_Basler_pylon_v3.lib" )
+list(APPEND _IMPORT_CHECK_FILES_FOR_GenICam::GCBase "${_IMPORT_PREFIX}/Basler/lib/x64/GCBase_MD_VC141_v3_1_Basler_pylon_v3.lib" )
 
 if(CMAKE_VERSION VERSION_LESS 3.0.0)
   message(FATAL_ERROR "This file relies on consumers using CMake 3.0.0 or greater.")
@@ -79,11 +79,11 @@ add_library(GenICam::GenApi SHARED IMPORTED)
 
 set_target_properties(GenICam::GenApi PROPERTIES
   INTERFACE_LINK_LIBRARIES "GenICam::Headers;GenICam::GCBase"
-  IMPORTED_IMPLIB "${_IMPORT_PREFIX}/Development/lib/x64/GenApi_MD_VC141_v3_1_Basler_pylon_v3.lib"
+  IMPORTED_IMPLIB "${_IMPORT_PREFIX}/Basler/lib/x64/GenApi_MD_VC141_v3_1_Basler_pylon_v3.lib"
 )
 
 list(APPEND _IMPORT_CHECK_TARGETS GenICam::GenApi )
-list(APPEND _IMPORT_CHECK_FILES_FOR_GenICam::GenApi "${_IMPORT_PREFIX}/Development/lib/x64/GenApi_MD_VC141_v3_1_Basler_pylon_v3.lib" )
+list(APPEND _IMPORT_CHECK_FILES_FOR_GenICam::GenApi "${_IMPORT_PREFIX}/Basler/lib/x64/GenApi_MD_VC141_v3_1_Basler_pylon_v3.lib" )
 
 if(CMAKE_VERSION VERSION_LESS 3.0.0)
   message(FATAL_ERROR "This file relies on consumers using CMake 3.0.0 or greater.")

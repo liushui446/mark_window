@@ -27,6 +27,7 @@ namespace sm
 			std::string serialNumber; //序列号
 			std::string szName; //相机自定义名称
 			void* m_hDevHandle; //相机控制句柄
+			CameraConfig camerainfo;
 
 			std::atomic <uchar*> data; //图像数据指针(暂存)
 		};
@@ -51,6 +52,9 @@ namespace sm
 
 		//等图只有软触发的时候使用
 		bool WaitForSingleImageCaptured(int GetImage_time) override;
+
+		//获取相机参数
+		int GetCameraParaInt(CameraParameter para);
 
 		//获取图片数据
 		int GetCameraData(unsigned char* data) override;

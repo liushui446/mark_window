@@ -16,7 +16,6 @@ namespace sm {
 		
 	}
 
-
 	int CameraManager::SoftWareTrigger(CameraID id) {
 		if (IDtoCamPtr(id) != nullptr) {
 			return IDtoCamPtr(id)->SoftwareTrigger();
@@ -43,6 +42,17 @@ namespace sm {
 			return IDtoCamPtr(id)->SaveImage(enSaveImageType);
 		}
 		else {
+			return -1;
+		}
+	}
+
+	int CameraManager::GetParaInt(CameraID id, CameraParameter parm) {
+		if (IDtoCamPtr(id) != nullptr)
+		{
+			return IDtoCamPtr(id)->GetCameraParaInt(parm);
+		}
+		else
+		{
 			return -1;
 		}
 	}

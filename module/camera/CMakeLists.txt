@@ -5,7 +5,7 @@ project (camera)
 
 find_package(OpenCV REQUIRED)
 # Locate pylon.
-find_package(pylon 8.0.1 REQUIRED)
+find_package(pylon REQUIRED)
 
 # 3. 收集源文件（建议用 GLOB_RECURSE 或显式列举，GLOB 可能漏文件）
 file(GLOB_RECURSE SRC_FILES 
@@ -26,8 +26,14 @@ target_include_directories(${PROJECT_NAME}
     PUBLIC 
 		${PROJECT_SOURCE_DIR}/include  # 自身头文件（对外暴露）
 		${OpenCV_INCLUDE_DIRS}            # OpenCV 头文件（仅内部使用）
-        ${pylon_INCLUDE_DIR}              # pylon 头文件（替换错误的 Basler_INCLUDE_DIRS）
+        #${pylon_INCLUDE_DIR}              # pylon 头文件（替换错误的 Basler_INCLUDE_DIRS）
+		${pylon_DIR}
 )
+message(INC: ${pylon_DIR})
+
+# ===================== 链接 Basler 库和其他依赖 =====================
+link_directories("${CMAKE_SOURCE_DIR}/3rdparty/Basler/lib/x64")
+link_directories("${CMAKE_SOURCE_DIR}/3rdparty/Basler/Runtime/x64")
 
 # 7. 链接依赖库：增加目标存在性检查（可选但更健壮）
 target_link_libraries(${PROJECT_NAME}
