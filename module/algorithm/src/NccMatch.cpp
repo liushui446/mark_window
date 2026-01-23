@@ -43,6 +43,19 @@ bool NccMatch::extractEdgePoints(const cv::Mat& grayImage, std::vector<cv::Point
     cv::Canny(grayImage, edges, 190, 230, 3, true);
     lastEdgeImage_ = edges.clone();
     int area = 20;
+    // 检测外层轮廓
+    std::vector<std::vector<cv::Point>> contours;
+    std::vector<cv::Vec4i> hierarchy;
+
+    cv::findContours(edges.clone(), contours, hierarchy,
+        cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+    // 创建与edges相同尺寸的黑色图像
+    cv::Mat contourImage = cv::Mat::zeros(edges.size(), CV_8UC1);
+
+    // 绘制所有外层轮廓为白色（255表示白色）
+    cv::drawContours(contourImage, contours, -1, cv::Scalar(255), 1);
+    edges = contourImage.clone();
     bool has_no_edge = (countNonZero(edges) == 0);
     if (has_no_edge==0)
         extractEdgePointsWithNoiseFilter(edges, edgePoints, area);
@@ -1589,3 +1602,554 @@ void NccMatch::extractEdgePointsWithNoiseFilter(const cv::Mat& edgeImage, std::v
         }
     }
 }
+
+////测试水平垂直线段位置
+bool NccMatch::Region_test(
+    const cv::Mat& grayImage,
+    const std::string& edgeXmlPath,
+    cv::Point2f& bestLoc,
+    float& bestAngle,
+    double& bestScore
+) {
+    try {
+        // 1. 初始化输出参数
+        bestLoc = cv::Point2f(-1, -1);
+        bestAngle = 0.0f;
+        bestScore = -1.0;
+        // 3. 读取待匹配图像并转换为灰度图
+       // cv::Mat testImg = cv::imread(testImagePath);
+        cv::Mat testImg = grayImage.clone();
+
+        cv::Mat testGray;
+        if (testImg.channels() == 3) {
+            cv::cvtColor(testImg, testGray, cv::COLOR_BGR2GRAY);
+        }
+        else if (testImg.channels() == 1) {
+            testGray = testImg.clone();
+        }
+        else {
+            return false;
+        }
+        //进行canny边缘检测
+        cv::Mat image_edge;
+        cv::Canny(testGray, image_edge, 140, 200, 3, true);
+        // 判断图像是否全黑（非零像素数为0，Canny输出的边缘图中255为边缘点）
+        bool isImageBlack = (cv::countNonZero(image_edge) == 0);
+        if (isImageBlack)
+        {
+            // 预处理：中值滤波去除椒盐噪声
+            cv::Mat medianFilteredImage;
+            cv::medianBlur(testGray, medianFilteredImage, 3);
+            cv::Mat preprocessedImage;
+            cv::equalizeHist(medianFilteredImage, preprocessedImage);  // 提高对比度
+
+            // 使用双边滤波减少噪声
+            cv::Mat smoothedImage2, edges2;
+            cv::bilateralFilter(preprocessedImage, smoothedImage2, 9, 75, 75);
+            //cv::Canny(smoothedImage2, edges2, 200, 230, 3, true);
+            cv::Canny(smoothedImage2, image_edge, 170, 230, 3, true);
+        }
+        
+                 // 5. 检测外层轮廓
+        std::vector<std::vector<cv::Point>> contours;
+        std::vector<cv::Vec4i> hierarchy;
+        cv::findContours(image_edge.clone(), contours, hierarchy,
+            cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+        // 6. 创建轮廓图像
+        cv::Mat contourImage = cv::Mat::zeros(image_edge.size(), CV_8UC1);
+        cv::drawContours(contourImage, contours, -1, cv::Scalar(255), 1);
+
+        // 7. 计算所有轮廓的最小外接矩形
+        if (contours.empty()) {
+            return false;
+        }
+
+        // 将所有轮廓点合并
+        std::vector<cv::Point> allPoints;
+        for (const auto& contour : contours) {
+            allPoints.insert(allPoints.end(), contour.begin(), contour.end());
+        }
+        std::vector<cv::Point2f> subedgePoints;
+        SubPixelByZernike(grayImage, allPoints, subedgePoints);
+
+        // 计算最小外接矩形
+        cv::RotatedRect minRect = cv::minAreaRect(allPoints);
+        cv::Rect boundingRect = minRect.boundingRect();
+
+        // 确保矩形在图像范围内
+        boundingRect &= cv::Rect(0, 0, contourImage.cols, contourImage.rows);
+
+        if (boundingRect.width <= 0 || boundingRect.height <= 0) {
+            return false;
+        }
+
+        // 8. 存储4条边的坐标（映射到原始图像）
+        std::vector<float> edgeCoordinates(4, -1); // 0:上边y, 1:下边y, 2:左边x, 3:右边x
+
+        // 外接矩形参数
+        int rectX = boundingRect.x;
+        int rectY = boundingRect.y;
+        int rectWidth = boundingRect.width;
+        int rectHeight = boundingRect.height;
+
+        // 每条边取中间40%的区域
+        float edgeRatio = 0.4f;
+
+        // 存储每个区域的边缘点
+        std::vector<std::vector<cv::Point>> regionPoints(4);
+
+        // 9. 上边缘区域（中间40%）
+        int topRegionWidth = static_cast<int>(rectWidth * edgeRatio);
+        int topStartX = rectX + (rectWidth - topRegionWidth) / 2;
+        int topEndX = topStartX + topRegionWidth;
+
+        // 上边区域的高度取一小段（比如10像素）
+        int topHeight = 10;
+        cv::Rect topRect(topStartX, rectY- (topHeight/2), topRegionWidth, topHeight);
+        topRect &= cv::Rect(0, 0, contourImage.cols, contourImage.rows);
+        cv::Mat topROI;
+        if (topRect.width > 0 && topRect.height > 0) {
+            topROI = contourImage(topRect);
+
+            // 提取上边缘点
+            std::vector<cv::Point> topPoints;
+            cv::findNonZero(topROI, topPoints);
+
+            if (!topPoints.empty()) {
+                // 将点坐标映射回原始图像
+                for (auto& pt : topPoints) {
+                    pt.x += topRect.x;
+                    pt.y += topRect.y;
+                    regionPoints[0].push_back(pt);
+                }
+            }
+        }
+
+        // 10. 下边缘区域（中间40%）
+        int bottomStartX = topStartX;  // 与上边对称
+        int bottomEndX = topEndX;
+        int bottomY = rectY + rectHeight - topHeight;
+
+        cv::Rect bottomRect(bottomStartX, bottomY+ (topHeight / 2), topRegionWidth, topHeight);
+        bottomRect &= cv::Rect(0, 0, contourImage.cols, contourImage.rows);
+        cv::Mat bottomROI;
+        if (bottomRect.width > 0 && bottomRect.height > 0) {
+             bottomROI = contourImage(bottomRect);
+
+            // 提取下边缘点
+            std::vector<cv::Point> bottomPoints;
+            cv::findNonZero(bottomROI, bottomPoints);
+
+            if (!bottomPoints.empty()) {
+                // 将点坐标映射回原始图像
+                for (auto& pt : bottomPoints) {
+                    pt.x += bottomRect.x;
+                    pt.y += bottomRect.y;
+                    regionPoints[1].push_back(pt);
+                }
+            }
+        }
+
+        // 11. 左边缘区域（中间40%）
+        int leftRegionHeight = static_cast<int>(rectHeight * edgeRatio);
+        int leftStartY = rectY + (rectHeight - leftRegionHeight) / 2;
+        int leftEndY = leftStartY + leftRegionHeight;
+
+        // 左边区域的宽度取一小段（10像素）
+        int leftWidth = 10;
+        cv::Rect leftRect(rectX-(leftWidth/2), leftStartY, leftWidth, leftRegionHeight);
+        leftRect &= cv::Rect(0, 0, contourImage.cols, contourImage.rows);
+        cv::Mat leftROI;
+        if (leftRect.width > 0 && leftRect.height > 0) {
+            leftROI = contourImage(leftRect);
+
+            // 提取左边缘点
+            std::vector<cv::Point> leftPoints;
+            cv::findNonZero(leftROI, leftPoints);
+
+            if (!leftPoints.empty()) {
+                // 将点坐标映射回原始图像
+                for (auto& pt : leftPoints) {
+                    pt.x += leftRect.x;
+                    pt.y += leftRect.y;
+                    regionPoints[2].push_back(pt);
+                }
+            }
+        }
+
+        // 12. 右边缘区域（中间40%）
+        int rightStartY = leftStartY;  // 与左边对称
+        int rightEndY = leftEndY;
+        int rightX = rectX + rectWidth - leftWidth;
+
+        cv::Rect rightRect(rightX+ (leftWidth / 2), rightStartY, leftWidth, leftRegionHeight);
+        rightRect &= cv::Rect(0, 0, contourImage.cols, contourImage.rows);
+        cv::Mat rightROI;
+        if (rightRect.width > 0 && rightRect.height > 0) {
+            rightROI = contourImage(rightRect);
+
+            // 提取右边缘点
+            std::vector<cv::Point> rightPoints;
+            cv::findNonZero(rightROI, rightPoints);
+
+            if (!rightPoints.empty()) {
+                // 将点坐标映射回原始图像
+                for (auto& pt : rightPoints) {
+                    pt.x += rightRect.x;
+                    pt.y += rightRect.y;
+                    regionPoints[3].push_back(pt);
+                }
+            }
+        }
+
+        // 13. 对每个区域的边缘点进行更精确的直线拟合
+        for (int i = 0; i < 4; ++i) {
+            if (regionPoints[i].size() < 2) {
+                continue;  // 点数太少，无法拟合
+            }
+
+            // 使用最小二乘法拟合直线
+            cv::Vec4f line;
+            cv::fitLine(regionPoints[i], line, cv::DIST_L2, 0, 0.01, 0.01);
+
+            // line[0], line[1] 是方向向量
+            // line[2], line[3] 是直线上的一点
+
+            float vx = line[0];
+            float vy = line[1];
+            float x0 = line[2];
+            float y0 = line[3];
+
+            if (i == 0 || i == 1) { // 上边或下边：需要水平线，y坐标为常数
+                // 计算拟合直线在区域中心x处的y值
+                float centerX = (i == 0) ? (topStartX + topRegionWidth / 2.0f) : (bottomStartX + topRegionWidth / 2.0f);
+
+                // 直线方程: (x - x0)/vx = (y - y0)/vy
+                // 所以 y = y0 + (x - x0) * vy / vx
+
+                // vx可能为0（垂直线），
+                if (std::abs(vx) > 1e-5) {
+                    float y = y0 + (centerX - x0) * vy / vx;
+                    edgeCoordinates[i] = y;
+                }
+                else {
+                    // 如果是垂直线，取所有点的平均y值
+                    float sumY = 0;
+                    for (const auto& pt : regionPoints[i]) {
+                        sumY += pt.y;
+                    }
+                    edgeCoordinates[i] = sumY / regionPoints[i].size();
+                }
+            }
+            else { // 左边或右边：需要垂直线，x坐标为常数
+             // 计算拟合直线在区域中心y处的x值
+                float centerY = (i == 2) ? (leftStartY + leftRegionHeight / 2.0f) : (rightStartY + leftRegionHeight / 2.0f);
+                if (std::abs(vy) > 1e-5) {
+                    float x = x0 + (centerY - y0) * vx / vy;
+                    edgeCoordinates[i] = x;
+                }
+                else {
+                    // 如果是水平线，取所有点的平均x值
+                    float sumX = 0;
+                    for (const auto& pt : regionPoints[i]) {
+                        sumX += pt.x;
+                    }
+                    edgeCoordinates[i] = sumX / regionPoints[i].size();
+                }
+            }
+
+            // 如果拟合效果不好，使用原始的平均值方法
+            if (edgeCoordinates[i] < 0) {
+                if (i == 0 || i == 1) {
+                    float sumY = 0;
+                    for (const auto& pt : regionPoints[i]) {
+                        sumY += pt.y;
+                    }
+                    edgeCoordinates[i] = sumY / regionPoints[i].size();
+                }
+                else {
+                    float sumX = 0;
+                    for (const auto& pt : regionPoints[i]) {
+                        sumX += pt.x;
+                    }
+                    edgeCoordinates[i] = sumX / regionPoints[i].size();
+                }
+            }
+        }
+
+        // 14. 计算上下距离和左右距离
+        float verticalDistance = -1.0f;  // 上下距离
+        float horizontalDistance = -1.0f; // 左右距离
+
+        if (edgeCoordinates[0] >= 0 && edgeCoordinates[1] >= 0) {
+            verticalDistance = std::abs(edgeCoordinates[1] - edgeCoordinates[0]);
+        }
+
+        if (edgeCoordinates[2] >= 0 && edgeCoordinates[3] >= 0) {
+            horizontalDistance = std::abs(edgeCoordinates[3] - edgeCoordinates[2]);
+        }
+        bestLoc.x = edgeCoordinates[2]+(horizontalDistance/2);
+        bestLoc.y = edgeCoordinates[0]+(verticalDistance/2);
+        return true;
+    }
+    catch (const std::exception& e) {
+        return false;
+    }
+}
+
+bool NccMatch::Region_test_subpix(
+    const cv::Mat& grayImage,
+    const std::string& edgeXmlPath,
+    cv::Point2f& bestLoc,
+    float& bestAngle,
+    double& bestScore
+) {
+    try {
+        // 1. 初始化输出参数
+        bestLoc = cv::Point2f(-1, -1);
+        bestAngle = 0.0f;
+        bestScore = -1.0;
+        // 3. 读取待匹配图像并转换为灰度图
+       // cv::Mat testImg = cv::imread(testImagePath);
+        cv::Mat testImg = grayImage.clone();
+
+        cv::Mat testGray;
+        if (testImg.channels() == 3) {
+            cv::cvtColor(testImg, testGray, cv::COLOR_BGR2GRAY);
+        }
+        else if (testImg.channels() == 1) {
+            testGray = testImg.clone();
+        }
+        else {
+            return false;
+        }
+        //进行canny边缘检测
+        cv::Mat image_edge;
+        cv::Canny(testGray, image_edge, 140, 200, 3, true);
+        // 判断图像是否全黑（非零像素数为0，Canny输出的边缘图中255为边缘点）
+        bool isImageBlack = (cv::countNonZero(image_edge) == 0);
+        if (isImageBlack)
+        {
+            // 预处理：中值滤波去除椒盐噪声
+            cv::Mat medianFilteredImage;
+            cv::medianBlur(testGray, medianFilteredImage, 3);
+            cv::Mat preprocessedImage;
+            cv::equalizeHist(medianFilteredImage, preprocessedImage);  // 提高对比度
+
+            // 使用双边滤波减少噪声
+            cv::Mat smoothedImage2, edges2;
+            cv::bilateralFilter(preprocessedImage, smoothedImage2, 9, 75, 75);
+            //cv::Canny(smoothedImage2, edges2, 200, 230, 3, true);
+            cv::Canny(smoothedImage2, image_edge, 170, 230, 3, true);
+        }
+
+        // 5. 检测外层轮廓
+        std::vector<std::vector<cv::Point>> contours;
+        std::vector<cv::Vec4i> hierarchy;
+        cv::findContours(image_edge.clone(), contours, hierarchy,
+            cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+        // 6. 创建轮廓图像
+        cv::Mat contourImage = cv::Mat::zeros(image_edge.size(), CV_8UC1);
+        cv::drawContours(contourImage, contours, -1, cv::Scalar(255), 1);
+
+        // 7. 计算所有轮廓的最小外接矩形
+        if (contours.empty()) {
+            return false;
+        }
+
+        // 将所有轮廓点合并
+        std::vector<cv::Point> allPoints;
+        cv::findNonZero(image_edge, allPoints);
+        std::vector<cv::Point2f> subedgePoints;
+        SubPixelByZernike(grayImage, allPoints, subedgePoints);
+
+        // 计算最小外接矩形（使用整数点）
+        cv::RotatedRect minRect = cv::minAreaRect(allPoints);
+        cv::Rect boundingRect = minRect.boundingRect();
+
+        // 确保矩形在图像范围内
+        boundingRect &= cv::Rect(0, 0, contourImage.cols, contourImage.rows);
+
+        if (boundingRect.width <= 0 || boundingRect.height <= 0) {
+            return false;
+        }
+
+        // 8. 存储4条边的坐标（映射到原始图像）
+        std::vector<float> edgeCoordinates(4, -1); // 0:上边y, 1:下边y, 2:左边x, 3:右边x
+
+        // 外接矩形参数
+        int rectX = boundingRect.x;
+        int rectY = boundingRect.y;
+        int rectWidth = boundingRect.width;
+        int rectHeight = boundingRect.height;
+
+        // 每条边取中间40%的区域
+        float edgeRatio = 0.4f;
+
+        // 存储每个区域的亚像素边缘点
+        std::vector<std::vector<cv::Point2f>> regionSubPoints(4);
+
+        // 9. 上边缘区域（中间40%）
+        int topRegionWidth = static_cast<int>(rectWidth * edgeRatio);
+        int topStartX = rectX + (rectWidth - topRegionWidth) / 2;
+        int topEndX = topStartX + topRegionWidth;
+
+        // 上边区域的高度取一小段（比如10像素）
+        int topHeight = 10;
+        cv::Rect topRect(topStartX, rectY - (topHeight / 2), topRegionWidth, topHeight);
+        topRect &= cv::Rect(0, 0, contourImage.cols, contourImage.rows);
+
+        // 10. 下边缘区域（中间40%）
+        int bottomStartX = topStartX;  // 与上边对称
+        int bottomEndX = topEndX;
+        int bottomY = rectY + rectHeight - topHeight;
+
+        cv::Rect bottomRect(bottomStartX, bottomY + (topHeight / 2), topRegionWidth, topHeight);
+        bottomRect &= cv::Rect(0, 0, contourImage.cols, contourImage.rows);
+
+        // 11. 左边缘区域（中间40%）
+        int leftRegionHeight = static_cast<int>(rectHeight * edgeRatio);
+        int leftStartY = rectY + (rectHeight - leftRegionHeight) / 2;
+        int leftEndY = leftStartY + leftRegionHeight;
+
+        // 左边区域的宽度取一小段（10像素）
+        int leftWidth = 10;
+        cv::Rect leftRect(rectX - (leftWidth / 2), leftStartY, leftWidth, leftRegionHeight);
+        leftRect &= cv::Rect(0, 0, contourImage.cols, contourImage.rows);
+
+        // 12. 右边缘区域（中间40%）
+        int rightStartY = leftStartY;  // 与左边对称
+        int rightEndY = leftEndY;
+        int rightX = rectX + rectWidth - leftWidth;
+
+        cv::Rect rightRect(rightX + (leftWidth / 2), rightStartY, leftWidth, leftRegionHeight);
+        rightRect &= cv::Rect(0, 0, contourImage.cols, contourImage.rows);
+
+        // 将矩形转换为浮点版本用于点判断
+        cv::Rect2f topRectF(topRect);
+        cv::Rect2f bottomRectF(bottomRect);
+        cv::Rect2f leftRectF(leftRect);
+        cv::Rect2f rightRectF(rightRect);
+
+        // 13. 从亚像素点中筛选属于各个区域的点
+        for (const auto& pt : subedgePoints) {
+            if (topRectF.contains(pt)) {
+                regionSubPoints[0].push_back(pt);
+            }
+            else if (bottomRectF.contains(pt)) {
+                regionSubPoints[1].push_back(pt);
+            }
+            else if (leftRectF.contains(pt)) {
+                regionSubPoints[2].push_back(pt);
+            }
+            else if (rightRectF.contains(pt)) {
+                regionSubPoints[3].push_back(pt);
+            }
+        }
+
+        // 14. 对每个区域的亚像素边缘点进行直线拟合
+        for (int i = 0; i < 4; ++i) {
+            if (regionSubPoints[i].size() < 2) {
+                continue;  // 点数太少，无法拟合
+            }
+
+            // 使用最小二乘法拟合直线
+            cv::Vec4f line;
+
+            // 将Point2f转换为Point用于fitLine（如果需要的话）
+            // 或者直接使用Point2f，但需要确保fitLine支持
+            // 这里我们使用Point2f转换为vector<Point2f>
+            std::vector<cv::Point2f> pointsForFit = regionSubPoints[i];
+            cv::fitLine(pointsForFit, line, cv::DIST_L2, 0, 0.01, 0.01);
+
+            // line[0], line[1] 是方向向量
+            // line[2], line[3] 是直线上的一点
+            float vx = line[0];
+            float vy = line[1];
+            float x0 = line[2];
+            float y0 = line[3];
+
+            if (i == 0 || i == 1) { // 上边或下边：需要水平线，y坐标为常数
+                // 计算拟合直线在区域中心x处的y值
+                float centerX = (i == 0) ? (topRectF.x + topRectF.width / 2.0f) :
+                    (bottomRectF.x + bottomRectF.width / 2.0f);
+
+                // 直线方程: (x - x0)/vx = (y - y0)/vy
+                // 所以 y = y0 + (x - x0) * vy / vx
+                if (std::abs(vx) > 1e-5) {
+                    float y = y0 + (centerX - x0) * vy / vx;
+                    edgeCoordinates[i] = y;
+                }
+                else {
+                    // 如果是垂直线，取所有点的平均y值
+                    float sumY = 0;
+                    for (const auto& pt : regionSubPoints[i]) {
+                        sumY += pt.y;
+                    }
+                    edgeCoordinates[i] = sumY / regionSubPoints[i].size();
+                }
+            }
+            else { // 左边或右边：需要垂直线，x坐标为常数
+                // 计算拟合直线在区域中心y处的x值
+                float centerY = (i == 2) ? (leftRectF.y + leftRectF.height / 2.0f) :
+                    (rightRectF.y + rightRectF.height / 2.0f);
+                if (std::abs(vy) > 1e-5) {
+                    float x = x0 + (centerY - y0) * vx / vy;
+                    edgeCoordinates[i] = x;
+                }
+                else {
+                    // 如果是水平线，取所有点的平均x值
+                    float sumX = 0;
+                    for (const auto& pt : regionSubPoints[i]) {
+                        sumX += pt.x;
+                    }
+                    edgeCoordinates[i] = sumX / regionSubPoints[i].size();
+                }
+            }
+
+            // 如果拟合效果不好，使用原始的平均值方法
+            if (edgeCoordinates[i] < 0) {
+                if (i == 0 || i == 1) {
+                    float sumY = 0;
+                    for (const auto& pt : regionSubPoints[i]) {
+                        sumY += pt.y;
+                    }
+                    edgeCoordinates[i] = sumY / regionSubPoints[i].size();
+                }
+                else {
+                    float sumX = 0;
+                    for (const auto& pt : regionSubPoints[i]) {
+                        sumX += pt.x;
+                    }
+                    edgeCoordinates[i] = sumX / regionSubPoints[i].size();
+                }
+            }
+        }
+
+        // 15. 计算上下距离和左右距离
+        float verticalDistance = -1.0f;  // 上下距离
+        float horizontalDistance = -1.0f; // 左右距离
+
+        if (edgeCoordinates[0] >= 0 && edgeCoordinates[1] >= 0) {
+            verticalDistance = std::abs(edgeCoordinates[1] - edgeCoordinates[0]);
+        }
+
+        if (edgeCoordinates[2] >= 0 && edgeCoordinates[3] >= 0) {
+            horizontalDistance = std::abs(edgeCoordinates[3] - edgeCoordinates[2]);
+        }
+
+        // 16. 计算中心位置
+        if (horizontalDistance > 0 && verticalDistance > 0) {
+            bestLoc.x = edgeCoordinates[2] + (horizontalDistance / 2.0f);
+            bestLoc.y = edgeCoordinates[0] + (verticalDistance / 2.0f);
+            return true;
+        }
+        return false;
+    }
+    catch (const std::exception& e) {
+        return false;
+    }
+}
+

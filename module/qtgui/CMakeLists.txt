@@ -14,7 +14,7 @@ find_package(
 	REQUIRED
 )
 # Add a library with the above sources
-add_library(${PROJECT_NAME} SHARED src/gui.cpp src/mainwindow.cpp src/ImageWindow.cpp src/selectablegraphicsview.cpp)
+add_library(${PROJECT_NAME} SHARED src/gui.cpp src/mainwindow.cpp src/ImageWindow.cpp src/selectablegraphicsview.cpp )
 add_library(sub::qtgui ALIAS ${PROJECT_NAME})
 
 target_include_directories( ${PROJECT_NAME}
