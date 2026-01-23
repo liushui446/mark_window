@@ -1,11 +1,10 @@
 ﻿#ifndef PROCESS_HPP
 #define PROCESS_HPP
-#include"core/std.hpp"
-#include <string>
-namespace sm {
-    
-    
 
+#include "core/CommonCore.hpp"
+
+namespace sm {
+	SM_EXPORTS void process_test();
 }
 
 #endif//

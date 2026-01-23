@@ -1,6 +1,6 @@
-#include "as/CommonCore.hpp"
+#include "core/CommonCore.hpp"
 
-namespace as
+namespace sm
 {
 	
 

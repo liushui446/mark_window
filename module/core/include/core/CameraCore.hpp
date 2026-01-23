@@ -3,7 +3,7 @@
 namespace sm
 {
     // 相机接口型号
-    enum CameraType
+    enum class CameraType
     {
         CAMERALINK = 0,
         GIGECAMERA,
@@ -49,7 +49,7 @@ namespace sm
     };
 
     // 相机厂商
-    enum CameraManufacturers
+    enum class CameraManufacturers
     {
         HIKcamear = 0,
         FLIRcamera,

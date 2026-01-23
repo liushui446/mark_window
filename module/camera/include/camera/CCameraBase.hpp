@@ -7,7 +7,7 @@
 #include "core/CameraCore.hpp"
 
 namespace sm {
-	class CCameraBase;//ControlCameraBase
+	//class CCameraBase;//ControlCameraBase
 
 	class CCameraBase {
 	public:
@@ -51,10 +51,10 @@ namespace sm {
 		virtual bool WaitForSingleImageCaptured(int GetImage_time) = 0;
 
 		//配置相机用户参数
-		virtual int ConfigureUserPara() = 0;
+		//virtual int ConfigureUserPara() = 0;
 
 		//配置相机初始化参数
-		virtual int SetParameters() = 0;
+		//virtual int SetParameters() = 0;
 
 		//关闭设备
 		virtual int CloseDevice() = 0;

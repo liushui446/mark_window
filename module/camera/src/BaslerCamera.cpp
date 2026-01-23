@@ -7,6 +7,10 @@ namespace sm
 		
 	}
 
+	BaslerCamera::~BaslerCamera()
+	{
+	}
+
 	int BaslerCamera::Init() {
 		return 0;
 	}

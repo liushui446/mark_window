@@ -1,8 +1,10 @@
 #ifndef CAMERA_HPP
 #define CAMERA_HPP
 
+#include"core/CommonCore.hpp"
+
 namespace sm
 {
-	void Camera_Test();
+	SM_EXPORTS void Camera_Test();
 }
 #endif

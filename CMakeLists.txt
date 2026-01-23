@@ -45,10 +45,10 @@ set_target_properties(${the_target} PROPERTIES
                         OUTPUT_NAME "${the_target}")
 # Add sub directories
 add_subdirectory(app)
-add_subdirectory(module/qtgui)
 add_subdirectory(module/core)
+add_subdirectory(module/camera)
+add_subdirectory(module/qtgui)
 add_subdirectory(module/log)
 add_subdirectory(module/algorithm)
 add_subdirectory(module/AutoFoucs)
-add_subdirectory(module/camera)
 add_subdirectory(module/process)

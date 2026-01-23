@@ -1,6 +1,8 @@
 ﻿#ifndef COMMONCORE_HPP
 #define COMMONCORE_HPP
 
+#include"core/std.hpp"
+
 #include <iostream>
 #include <string>
 #include <memory>
@@ -46,6 +48,9 @@ typedef float               FLOAT;
 typedef double				DOUBLE;
 typedef int                 INT;
 typedef unsigned int        UINT;
+
+typedef unsigned char uchar;
+typedef unsigned short ushort;
 
 #define	MARK_SUM (40)		// Mark点数
 

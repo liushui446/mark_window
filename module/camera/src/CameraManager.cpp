@@ -1,5 +1,4 @@
 #include "camera/CameraManager.hpp"
-#include <iostream>
 
 namespace sm {
 
