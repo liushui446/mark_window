@@ -32,10 +32,22 @@ namespace sm {
 		
 	}
 
-	int CameraManager::Init(CameraID id) {
+	int CameraManager::Init() {
 
+		CameraID id = CameraID::CAMERA_ID_MAIN;
 		if (IDtoCamPtr(id) != nullptr) {
 			return IDtoCamPtr(id)->Init();
+		}
+		else {
+			return -1;
+		}
+		return 0;
+	}
+
+	int CameraManager::Test(CameraID id) {
+
+		if (IDtoCamPtr(id) != nullptr) {
+			return IDtoCamPtr(id)->CameraTest();
 		}
 		else {
 			return -1;

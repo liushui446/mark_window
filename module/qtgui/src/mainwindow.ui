@@ -683,14 +683,20 @@ QGroupBox::title { color: black; }</string>
          <layout class="QHBoxLayout" name="toolbarLayout">
           <item>
            <widget class="QPushButton" name="pushButton_tool1">
+            <property name="minimumSize">
+             <size>
+              <width>80</width>
+              <height>30</height>
+             </size>
+            </property>
             <property name="maximumSize">
              <size>
-              <width>24</width>
-              <height>24</height>
+              <width>80</width>
+              <height>30</height>
              </size>
             </property>
             <property name="text">
-             <string/>
+             <string>打开相机</string>
             </property>
             <property name="icon">
              <iconset theme="go-up">
@@ -700,14 +706,20 @@ QGroupBox::title { color: black; }</string>
           </item>
           <item>
            <widget class="QPushButton" name="pushButton_tool2">
+            <property name="minimumSize">
+             <size>
+              <width>80</width>
+              <height>30</height>
+             </size>
+            </property>
             <property name="maximumSize">
              <size>
-              <width>24</width>
-              <height>24</height>
+              <width>80</width>
+              <height>30</height>
              </size>
             </property>
             <property name="text">
-             <string/>
+             <string>关闭相机</string>
             </property>
             <property name="icon">
              <iconset theme="edit-undo">
@@ -720,7 +732,7 @@ QGroupBox::title { color: black; }</string>
             <property name="maximumSize">
              <size>
               <width>24</width>
-              <height>24</height>
+              <height>30</height>
              </size>
             </property>
             <property name="text">
@@ -1171,7 +1183,7 @@ QGroupBox::title { color: black; }</string>
      <x>0</x>
      <y>0</y>
      <width>1316</width>
-     <height>21</height>
+     <height>26</height>
     </rect>
    </property>
    <widget class="QMenu" name="menu">

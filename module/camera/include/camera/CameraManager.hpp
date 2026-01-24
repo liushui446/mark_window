@@ -25,7 +25,9 @@ namespace sm {
 		CameraManager();
 		~CameraManager();
 
-		int Init(CameraID id);
+		int Init();
+
+		int Test(CameraID id);
 
 		//»Ì¥•∑¢
 		int SoftWareTrigger(CameraID id);

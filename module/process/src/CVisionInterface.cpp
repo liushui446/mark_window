@@ -26,6 +26,14 @@ namespace sm {
 
 	APIErrCode CVisionInterface::Init()
 	{
+		//相机初始化
+		CameraManager::GetInstance().Init();
+		return APIErrCode::SUCCESS;
+	}
+
+	APIErrCode CVisionInterface::CloseCamera()
+	{
+
 		return APIErrCode::SUCCESS;
 	}
 
@@ -34,7 +42,7 @@ namespace sm {
 		CameraID id = CameraID::CAMERA_ID_MAIN;
 		//相机控制
 		//HardWare_Move::GetInstance().ControlRGBWHA_AllClose();
-		CameraManager::GetInstance().Init(id);
+		CameraManager::GetInstance().Test(id);
 
 		// 获得一张图片
 		int width = CameraManager::GetInstance().GetParaInt(id, CameraParameter::CAMERA_PARA_WIDTH);

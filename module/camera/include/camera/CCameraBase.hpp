@@ -41,6 +41,8 @@ namespace sm {
 		//相机初始化函数
 		virtual int Init() = 0;
 
+		virtual int CameraTest() = 0;
+
 		//深拷贝得到图像数据
 		virtual int GetCameraData(unsigned char* data) = 0;
 

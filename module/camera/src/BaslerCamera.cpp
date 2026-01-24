@@ -28,6 +28,14 @@ namespace sm
 
 	int BaslerCamera::Init() {
 
+		//打开相机
+		OpenCamera();
+
+		return 0;
+	}
+
+	int BaslerCamera::CameraTest() {
+
 		string img_path = "D:\\test_images\\123.jpg";
 		Mat img = imread(img_path);
 		if (img.empty()) {
@@ -52,7 +60,7 @@ namespace sm
 			img_8u = img;
 		}
 		Mat img_continuous = img_8u.isContinuous() ? img_8u : img_8u.clone();
-		
+
 		// 4. 计算数据总字节数
 		size_t img_size = img_continuous.total() * img_continuous.elemSize();
 		// 5. 分配独立堆内存（替代直接赋值 Mat 的临时指针）
@@ -65,7 +73,7 @@ namespace sm
 		memcpy_s(new_data, img_size, img_continuous.data, img_size);
 
 		// ========== 原子更新指针（释放旧内存，避免泄漏） ==========
-	// 7. 读取旧指针并释放
+		// 7. 读取旧指针并释放
 		uchar* old_data = pBaslerMember->data.load(memory_order_relaxed);
 		if (old_data != nullptr) {
 			delete[] old_data; // 释放第一次分配的内存
@@ -81,6 +89,13 @@ namespace sm
 		pBaslerMember->camerainfo.channels = img_continuous.channels();
 
 		cout << "图片读取并拷贝成功！数据长度：" << img_size << endl;
+		return 0;
+	}
+
+	int BaslerCamera::OpenCamera() {
+		if (pBaslerMember->m_hDevHandle == nullptr) {
+			return -1;
+		}
 
 		return 0;
 	}

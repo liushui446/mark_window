@@ -55,6 +55,8 @@ private slots:
     void onSecondViewMenuAction(const QString& action); // 第二个视图的菜单动作
 
     void on_Camera_test();
+    void on_OpenCamera_test();//打开相机
+    void on_CloseCamera_test();//关闭相机
 
 
 private:

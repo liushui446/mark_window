@@ -45,6 +45,12 @@ namespace sm
 		//相机初始化
 		int Init() override;
 
+		//测试接口
+		int CameraTest() override;
+
+		//打开相机
+		int OpenCamera();
+
 		//设置Pimple基本参数
 		//int SetPimpleParameters();
 

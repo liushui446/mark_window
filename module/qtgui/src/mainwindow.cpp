@@ -132,6 +132,10 @@ MainWindow::MainWindow(QWidget* parent)
 
     connect(ui->pushButton_7, &QPushButton::clicked, this, &MainWindow::on_Camera_test);
 
+    connect(ui->pushButton_tool1, &QPushButton::clicked, this, &MainWindow::on_OpenCamera_test);
+
+    connect(ui->pushButton_tool2, &QPushButton::clicked, this, &MainWindow::on_CloseCamera_test);
+
     // 为graphicsView的视口安装事件过滤器
     ui->graphicsView->viewport()->installEventFilter(this);
 
@@ -1877,6 +1881,17 @@ void MainWindow::on_Camera_test()
 
     ui->graphicsView_2->resetTransform();
     ui->graphicsView_2->fitInView(pixmapItem2, Qt::KeepAspectRatio);
+}
+
+//相机初始化
+void MainWindow::on_OpenCamera_test()
+{
+    sm::CVisionInterface::Ins().Init();
+}
+
+void MainWindow::on_CloseCamera_test()
+{
+    //sm::CVisionInterface::Ins().();
 }
 
 void MainWindow::SearchAndConnectCamera()

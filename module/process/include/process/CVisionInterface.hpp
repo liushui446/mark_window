@@ -30,6 +30,8 @@ namespace sm {
 	public:
 		// 初始化
 		APIErrCode Init();
+		//关闭相机
+		APIErrCode CloseCamera();
 		//相机拍照
 		APIErrCode CameraCapture(cv::Mat& img);
 
