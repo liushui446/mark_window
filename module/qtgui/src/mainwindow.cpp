@@ -19,18 +19,50 @@
 #include <filesystem>  // C++17的文件系统支持
 #include <opencv2/opencv.hpp>
 #include <QTime>
-#include<algorithm/markInterface.h>
+#include <algorithm/markInterface.h>
 #include <QMessageBox>
-#include<AutoFoucs/Foucs.h>
+#include <AutoFoucs/Foucs.h>
 #include <QStringListModel> 
 #include "selectablegraphicsview.h"
 #include <algorithm/NccMatchDll.h>
-#include"core/core.hpp"
+#include "core/core.hpp"
+#include "../../camera/include/camera/camera.hpp"
+
+#include <stdio.h>
+#include <Windows.h>
+#include <conio.h>
+#include <iostream>
+#include <string>
+#include <iostream>
+#include <filesystem>
+
+// Include files to use OpenCV API.
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/opencv.hpp>
+// Include files to use the PYLON API.
+#include <pylon/PylonIncludes.h>
+#include <pylon/usb/BaslerUsbInstantCamera.h>
+
+
+
+//#include "camera/camera.hpp"
+//#include <Windows.h>  // 包含 SetThreadDescription 所需的声明
+
+//#include "camera.hpp"
 //#include <algorithm/src/markInterface.h>
+
 namespace fs = std::filesystem;
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
+
+using namespace std;
+using namespace sm;
+
+using namespace Pylon;
+using namespace GenApi;
+using namespace cv;
 
 
 //MainWindow::MainWindow(QWidget* parent)
@@ -88,8 +120,16 @@ MainWindow::MainWindow(QWidget* parent)
 {
     ui->setupUi(this);
 
+    /*std::thread outputExeclThread(&sm::CameraManager::UseBaslerCam, &sm::CameraManager::GetInstance());
+    SetThreadDescription(outputExeclThread.native_handle(), L"outputExeclThread");
+    outputExeclThread.detach();*/
+
+    //CameraManager::GetInstance().UseBaslerCam();
     // 连接按钮信号槽
     connect(ui->pushButton_6, &QPushButton::clicked, this, &MainWindow::on_loadFeatureButton_clicked);
+
+    connect(ui->pushButton_7, &QPushButton::clicked, this, &MainWindow::on_Camera_test);
+
     // 为graphicsView的视口安装事件过滤器
     ui->graphicsView->viewport()->installEventFilter(this);
 
@@ -473,14 +513,14 @@ QPixmap MainWindow::generateBinaryPixmap(const QPixmap& pixmap)
     // 计算 ROI 以中心为点，宽高减去 offset
     int centerX = mat.cols / 2;
     int centerY = mat.rows / 2;
-    int halfWidth = std::max((mat.cols - offset) / 2, 0);
-    int halfHeight = std::max((mat.rows - offset) / 2, 0);
+    int halfWidth = max((mat.cols - offset) / 2, 0);
+    int halfHeight = max((mat.rows - offset) / 2, 0);
     // 选择较小的半边长作为正方形 ROI 的半边长
-    int halfSize = std::min(halfWidth, halfHeight);
-    int x = std::max(centerX - halfSize, 0);
-    int y = std::max(centerY - halfSize, 0);
+    int halfSize = min(halfWidth, halfHeight);
+    int x = max(centerX - halfSize, 0);
+    int y = max(centerY - halfSize, 0);
     // 调整半边长以确保 ROI 不超出图像边界
-    halfSize = std::min({ halfSize, mat.cols - x, mat.rows - y });
+    halfSize = min(halfSize, mat.cols - x, mat.rows - y);
 
     if (halfSize <= 0 ) {
         // ROI无效，直接整体二值化或返回原图
@@ -630,13 +670,13 @@ void MainWindow::on_pushButton_5_clicked()
         // 计算最大可能的正方形半边长（考虑偏移和边界）
         int maxHalfWidth = (mat.cols - offset) / 2;
         int maxHalfHeight = (mat.rows - offset) / 2;
-        int halfSize = std::min(maxHalfWidth, maxHalfHeight);
-        halfSize = std::max(halfSize, 50);  // 最小半边长限制（避免过小ROI）
+        int halfSize = min(maxHalfWidth, maxHalfHeight);
+        halfSize = max(halfSize, 50);  // 最小半边长限制（避免过小ROI）
 
         // 计算ROI坐标（确保不超出边界）
-        int x = std::max(0, centerX - halfSize);
-        int y = std::max(0, centerY - halfSize);
-        int size = std::min(2 * halfSize, std::min(mat.cols - x, mat.rows - y));  // 最终边长
+        int x = max(0, centerX - halfSize);
+        int y = max(0, centerY - halfSize);
+        int size = min(2 * halfSize, min(mat.cols - x, mat.rows - y));  // 最终边长
 
         // 赋值给自定义ROI结构体
         roi.x = x;
@@ -814,14 +854,14 @@ void MainWindow::on_pushButton_2_clicked()
                 // 2. 无选中区域，使用默认正方形ROI计算
                 int centerX = mat.cols / 2;
                 int centerY = mat.rows / 2;
-                int halfWidth = std::max((mat.cols - offset) / 2, 0);
-                int halfHeight = std::max((mat.rows - offset) / 2, 0);
-                int halfSize = std::min(halfWidth, halfHeight);
-                halfSize = std::max(halfSize, 50);  // 最小半边长限制
+                int halfWidth = max((mat.cols - offset) / 2, 0);
+                int halfHeight = max((mat.rows - offset) / 2, 0);
+                int halfSize = min(halfWidth, halfHeight);
+                halfSize = max(halfSize, 50);  // 最小半边长限制
 
-                int x = std::max(centerX - halfSize, 0);
-                int y = std::max(centerY - halfSize, 0);
-                int size = std::min(2 * halfSize, std::min(mat.cols - x, mat.rows - y));  // 最终边长
+                int x = max(centerX - halfSize, 0);
+                int y = max(centerY - halfSize, 0);
+                int size = min(2 * halfSize, min(mat.cols - x, mat.rows - y));  // 最终边长
 
                 // 赋值给自定义ROI
                 roi.x = x;
@@ -965,14 +1005,14 @@ void MainWindow::on_pushButton_2_clicked()
             // 2. 无选中区域，使用默认计算
             int centerX = mat.cols / 2;
             int centerY = mat.rows / 2;
-            int halfWidth = std::max((mat.cols - offset) / 2, 0);
-            int halfHeight = std::max((mat.rows - offset) / 2, 0);
-            int halfSize = std::min(halfWidth, halfHeight);
-            halfSize = std::max(halfSize, 50);  // 最小半边长
+            int halfWidth = max((mat.cols - offset) / 2, 0);
+            int halfHeight = max((mat.rows - offset) / 2, 0);
+            int halfSize = min(halfWidth, halfHeight);
+            halfSize = max(halfSize, 50);  // 最小半边长
 
-            int x = std::max(centerX - halfSize, 0);
-            int y = std::max(centerY - halfSize, 0);
-            int size = std::min(2 * halfSize, std::min(mat.cols - x, mat.rows - y));
+            int x = max(centerX - halfSize, 0);
+            int y = max(centerY - halfSize, 0);
+            int size = min(2 * halfSize, min(mat.cols - x, mat.rows - y));
 
             roi.x = x;
             roi.y = y;
@@ -1356,14 +1396,14 @@ void MainWindow::on_pushButton_11_clicked()
         // 无选中区域时使用默认正方形ROI计算
         int centerX = mat.cols / 2;
         int centerY = mat.rows / 2;
-        int halfWidth = std::max((mat.cols - offset) / 2, 0);
-        int halfHeight = std::max((mat.rows - offset) / 2, 0);
-        int halfSize = std::min(halfWidth, halfHeight);
-        halfSize = std::max(halfSize, 50);  // 最小半边长限制（确保有效区域）
+        int halfWidth = max((mat.cols - offset) / 2, 0);
+        int halfHeight = max((mat.rows - offset) / 2, 0);
+        int halfSize = min(halfWidth, halfHeight);
+        halfSize = max(halfSize, 50);  // 最小半边长限制（确保有效区域）
 
-        int x = std::max(centerX - halfSize, 0);
-        int y = std::max(centerY - halfSize, 0);
-        int size = std::min(2 * halfSize, std::min(mat.cols - x, mat.rows - y));
+        int x = max(centerX - halfSize, 0);
+        int y = max(centerY - halfSize, 0);
+        int size = min(2 * halfSize, min(mat.cols - x, mat.rows - y));
 
         // 赋值给自定义ROI结构体
         roi.x = x;
@@ -1810,4 +1850,193 @@ void MainWindow::mousePressEvent(QMouseEvent* event)
     QPointF scenePos = ui->graphicsView->mapToScene(event->pos());
     qDebug() << "点击位置：" << scenePos;
     QMainWindow::mousePressEvent(event);
+}
+
+void MainWindow::on_Camera_test()
+{
+    try
+    {
+        // Create an instant camera object with the camera device found first.
+        // 1. 连接并初始化 Basler USB 相机，配置曝光时间、增益、伽马等参数；
+        qDebug() << "Creating Camera..." << endl;
+        CBaslerUsbInstantCamera camera(CTlFactory::GetInstance().CreateFirstDevice());
+
+        // Print the model name of the camera.
+        qDebug() << "Using device " << camera.GetDeviceInfo().GetModelName() << endl;
+
+        // Open the camera.
+        camera.Open();
+
+        // Set exposure time to ensure 30 FPS.
+        INodeMap& nodeMap = camera.GetNodeMap();
+        CFloatPtr exposureTime = nodeMap.GetNode("ExposureTime");
+        if (IsWritable(exposureTime))
+        {
+            exposureTime->SetValue(40000.0); // 将曝光时间设置为10000微秒
+        }
+        else
+        {
+            qDebug() << "ExposureTime is not writable." << endl;
+        }
+
+        // Set gain.
+        CFloatPtr gain = nodeMap.GetNode("Gain");
+        if (IsWritable(gain))
+        {
+            gain->SetValue(10.0); // 将增益设置为10 dB
+        }
+        else
+        {
+            qDebug() << "Gain is not writable." << endl;
+        }
+
+        // Set gamma.
+        CFloatPtr gamma = nodeMap.GetNode("Gamma");
+        if (IsWritable(gamma))
+        {
+            gamma->SetValue(1.2); // 将伽马值设置为1.2
+        }
+        else
+        {
+            qDebug() << "Gamma is not writable." << endl;
+        }
+
+        //2. 实时采集相机图像，将 Basler 相机的原始图像格式转换为 OpenCV 可处理的 BGR 格式；
+        // Create pylon image format converter and pylon image.
+        CImageFormatConverter formatConverter;
+        formatConverter.OutputPixelFormat = PixelType_BGR8packed;
+        CPylonImage pylonImage;
+
+        // Create an OpenCV image.
+        Mat openCvImage;
+
+        // Start grabbing images.
+        camera.StartGrabbing(GrabStrategy_LatestImageOnly);
+
+        // This smart pointer will receive grab result data.
+        CGrabResultPtr ptrGrabResult;
+
+        //3. 将采集的图像序列保存为 AVI 格式的视频文件；
+        // Create video writer.
+        VideoWriter videoWriter;
+        int codec = VideoWriter::fourcc('M', 'J', 'P', 'G'); // Select video codec
+        double fps = 30.0; // Set frame rate
+        string videoFileName = "D:/video.avi"; // Video file name
+        bool isVideoWriterOpen = false;
+
+        // Frame counter for saving every 5th frame
+        int frameCounter = 0;
+
+        // Variables for frame rate calculation
+        int frameCount = 0;
+        double totalTime = 0.0;
+        double startTime = static_cast<double>(getTickCount());
+
+        // Camera.StopGrabbing() is called by RetrieveResult() method when c_countOfImagesToGrab images have been retrieved.
+        while (camera.IsGrabbing())
+        {
+            // 等待采集结果，超时 5000 毫秒，超时则抛异常
+            // Wait for an image and then retrieve it. A timeout of 5000 ms is used.
+            camera.RetrieveResult(5000, ptrGrabResult, TimeoutHandling_ThrowException);
+
+            // Image grabbed successfully?
+            if (ptrGrabResult->GrabSucceeded())// 采集成功
+            {
+                // Access the image data.
+                qDebug() << "SizeX: " << ptrGrabResult->GetWidth() << endl;
+                qDebug() << "SizeY: " << ptrGrabResult->GetHeight() << endl;
+                const uint8_t* pImageBuffer = (uint8_t*)ptrGrabResult->GetBuffer();
+                qDebug() << "Gray value of first pixel: " << (uint32_t)pImageBuffer[0] << endl << endl;
+
+                // Convert the grabbed buffer to pylon image.
+                formatConverter.Convert(pylonImage, ptrGrabResult);
+                // Create an OpenCV image out of pylon image.
+                openCvImage = cv::Mat(ptrGrabResult->GetHeight(), ptrGrabResult->GetWidth(), CV_8UC3, (uint8_t*)pylonImage.GetBuffer());
+
+                // 3. 打开视频写入器（首次采集成功时）
+                if (!isVideoWriterOpen)
+                {
+                    videoWriter.open(videoFileName, codec, fps, openCvImage.size(), true);
+                    if (!videoWriter.isOpened())
+                    {
+                        qDebug() << "Could not open the output video file for write" << endl;
+                        return;
+                    }
+                    isVideoWriterOpen = true;
+                }
+
+                // 4. 写入当前帧到视频文件
+                videoWriter.write(openCvImage);
+
+                //5. 每采集 5 帧图像就保存一张 PNG 格式的截图；
+                // Save every 5th frame as an image
+                if (frameCounter % 5 == 0)
+                {
+                    string imageFileName = "D:/picture/frame_" + to_string(frameCounter) + ".png";
+                    imwrite(imageFileName, openCvImage);
+                    qDebug() << "Saved frame " << frameCounter  << endl;
+                    //qDebug() << "im" << imageFileName << endl;
+                }
+
+                // 6. 计算并输出实时帧率
+                // Increment frame counter
+                frameCounter++;
+                // Calculate frame rate
+                frameCount++;
+                double currentTime = static_cast<double>(getTickCount());
+                double elapsedTime = (currentTime - startTime) / getTickFrequency();
+                totalTime += elapsedTime;
+                double frameRate = frameCount / totalTime;
+                qDebug() << "Frame rate: " << frameRate << " fps" << endl;
+                // Reset start time for next frame
+                startTime = currentTime;
+
+                //7.实时显示采集到的图像画面；
+                // Create a display window.
+                namedWindow("OpenCV Display Window", WINDOW_NORMAL);
+                // Display the current image with OpenCV.
+                imshow("OpenCV Display Window", openCvImage);
+                // Define a timeout for customer's input in ms.
+                // '0' means indefinite, i.e. the next image will be displayed after closing the window 
+                // '1' means live stream.
+                if (waitKey(1) >= 0)
+                {
+                    break;
+                }
+            }
+            else
+            {
+                qDebug() << "Error: " << ptrGrabResult->GetErrorCode() << " " << ptrGrabResult->GetErrorDescription() << endl;
+            }
+        }
+
+        // Release the video writer.
+        if (isVideoWriterOpen)
+        {
+            videoWriter.release();
+        }
+
+        // Close the camera.
+        camera.Close();
+    }
+    catch (GenICam::GenericException& e)
+    {
+        // Error handling.
+        qDebug() << "An exception occurred." << endl
+            << e.GetDescription() << endl;
+    }
+}
+
+void MainWindow::SearchAndConnectCamera()
+{
+    CTlFactory& tlFactory = CTlFactory::GetInstance();
+    DeviceInfoList_t devices;
+    tlFactory.EnumerateDevices(devices); // 枚举设备
+
+    if (devices.empty()) {
+        throw RUNTIME_EXCEPTION("No camera found.");
+    }
+
+    CInstantCamera camera(tlFactory.CreateDevice(devices[0]));
+    camera.Open(); // 连接首台相机
 }

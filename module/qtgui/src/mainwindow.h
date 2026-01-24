@@ -33,6 +33,8 @@ public:
         int h = 0;
         std::vector<FeaturePoint> features;
     };
+
+    void SearchAndConnectCamera();
    
 private slots:
     //void on_actionq_triggered();      // 新建操作槽函数
@@ -51,6 +53,9 @@ private slots:
     void onSecondViewRectSelected(const QRectF& rect);
     void onFirstViewMenuAction(const QString& action);  // 第一个视图的菜单动作
     void onSecondViewMenuAction(const QString& action); // 第二个视图的菜单动作
+
+    void on_Camera_test();
+
 
 private:
     Ui::MainWindow* ui;
