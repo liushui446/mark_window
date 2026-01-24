@@ -29,6 +29,7 @@ target_link_libraries(${PROJECT_NAME}
 	PUBLIC
 		sub::core
 		sub::log
+		sub::camera
 		sub::algorithm
 		sub::AutoFoucs
 		Qt5::Widgets

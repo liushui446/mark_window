@@ -31,7 +31,15 @@ namespace sm
 
 	int BaslerCamera::GetCameraData(unsigned char* data)
 	{
-
+		if (pBaslerMember == nullptr)
+		{
+			return -1;
+		}
+		else
+		{
+			memcpy_s(data, pBaslerMember->camerainfo.ImageSize, pBaslerMember->data, pBaslerMember->camerainfo.ImageSize);
+		}
+		return 0;
 		return 0;
 	}
 

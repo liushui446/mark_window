@@ -65,6 +65,7 @@ namespace sm
 		//¹Ø±ÕÏà»ú
 		int CloseDevice() override;
 
+
 	private:
 		//struct BaslerPimple;
 		shared_ptr<BaslerPimple> pBaslerMember;

@@ -39,13 +39,29 @@ endif()
 set(pylon_DIR "${CMAKE_SOURCE_DIR}/3rdparty/Basler/cmake/pylon")
 
 # 设置输出目录
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set_target_properties(${the_target} PROPERTIES
-                        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-                        OUTPUT_NAME "${the_target}")
+# set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+# set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+# set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+# set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+# set_target_properties(${the_target} PROPERTIES
+                        # RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+                        # OUTPUT_NAME "${the_target}")
+						
+# 设置输出目录						
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)  # 可执行文件输出目录
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)  # 静态库/导入库输出目录
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)  # 动态库输出目录（Linux/Mac）
+
+# ===================== 关键：给所有模块设置分组，按业务层级排序 =====================
+# 定义一个函数，批量给模块设置分组（避免重复代码）
+function(set_module_folder target_name folder_name)
+    if(TARGET ${target_name})
+        set_target_properties(${target_name} PROPERTIES
+            FOLDER "${folder_name}"  # 设置VS中的显示分组
+        )
+    endif()
+endfunction()
+
 # Add sub directories
 add_subdirectory(app)
 add_subdirectory(module/core)

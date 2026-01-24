@@ -40,6 +40,8 @@ namespace sm {
 		//获取图像数据
 		int GetCameraData(CameraID id, unsigned char* data);
 
+		int UseCameraDemo();
+
 		//CameraID转相机实例对象
 		inline CameraPtr IDtoCamPtr(CameraID id)
 		{
