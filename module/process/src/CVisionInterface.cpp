@@ -5,37 +5,45 @@
 namespace sm {
     
 	/*
-	=============== 图像接口Base类 ===============
+	=============== 图像接口类 ===============
 	*/
 
-	CVisionProcessBase::CVisionProcessBase()
+	CVisionInterface& CVisionInterface::Ins() {
+		static CVisionInterface instance;
+		return instance;
+	}
+
+	CVisionInterface::~CVisionInterface()
 	{
 
 	}
 
-	CVisionProcessBase::~CVisionProcessBase()
+
+	CVisionInterface::CVisionInterface()
 	{
 
 	}
 
-	APIErrCode CVisionProcessBase::Init()
+	APIErrCode CVisionInterface::Init()
 	{
-
 		return APIErrCode::SUCCESS;
 	}
 
-	APIErrCode CVisionProcessBase::CameraCapture(cv::Mat& img)
+	APIErrCode CVisionInterface::CameraCapture(cv::Mat& img)
 	{
-		
+		CameraID id = CameraID::CAMERA_ID_MAIN;
 		//相机控制
 		//HardWare_Move::GetInstance().ControlRGBWHA_AllClose();
+		CameraManager::GetInstance().Init(id);
 
 		// 获得一张图片
-		int width = CameraManager::GetInstance().GetParaInt(CameraID::CAMERA_ID_MAIN, CameraParameter::CAMERA_PARA_WIDTH);
-		int height = CameraManager::GetInstance().GetParaInt(CameraID::CAMERA_ID_MAIN, CameraParameter::CAMERA_PARA_HEIGHT);
+		int width = CameraManager::GetInstance().GetParaInt(id, CameraParameter::CAMERA_PARA_WIDTH);
+		int height = CameraManager::GetInstance().GetParaInt(id, CameraParameter::CAMERA_PARA_HEIGHT);
+		int channel = CameraManager::GetInstance().GetParaInt(id, CameraParameter::CAMERA_CHANNEL);
 		
-		img = cv::Mat::zeros(height, width, CV_8UC1);
-		CameraManager::GetInstance().GetCameraData(CameraID::CAMERA_ID_MAIN, img.data);
+		img = cv::Mat::zeros(height, width, channel);
+		CameraManager::GetInstance().GetCameraData(id, img.data);
+		img.convertTo(img, CV_8UC3);
 
 		return APIErrCode::SUCCESS;
 	}

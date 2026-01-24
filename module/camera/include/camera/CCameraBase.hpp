@@ -53,6 +53,8 @@ namespace sm {
 		//配置相机用户参数
 		//virtual int ConfigureUserPara() = 0;
 
+		virtual int SetShootParams() = 0;
+
 		//配置相机初始化参数
 		//virtual int SetParameters() = 0;
 		virtual int GetCameraParaInt(CameraParameter para) = 0;

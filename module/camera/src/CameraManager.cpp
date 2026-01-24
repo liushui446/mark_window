@@ -1,4 +1,5 @@
 #include "camera/CameraManager.hpp"
+#include "camera/BaslerCamera.hpp"
 
 #include <pylon/PylonIncludes.h>
 #include <pylon/usb/PylonUsbIncludes.h>
@@ -20,11 +21,26 @@ namespace sm {
 	}
 
 	CameraManager::CameraManager() {
-		
+		CameraID id = CameraID::CAMERA_ID_MAIN;
+		pMembers = make_shared<Pimple>();
+		auto cameraPtr = std::make_shared<BaslerCamera>(id);
+		//pMembers->AccessByCameraID.insert(pair<CameraID, CameraPtr>(id, cameraPtr));
+		pMembers->AccessByCameraID.emplace(id, cameraPtr);
 	}
 
 	CameraManager::~CameraManager() {
 		
+	}
+
+	int CameraManager::Init(CameraID id) {
+
+		if (IDtoCamPtr(id) != nullptr) {
+			return IDtoCamPtr(id)->Init();
+		}
+		else {
+			return -1;
+		}
+		return 0;
 	}
 
 	int CameraManager::SoftWareTrigger(CameraID id) {
@@ -57,6 +73,8 @@ namespace sm {
 		}
 	}
 
+
+
 	int CameraManager::GetParaInt(CameraID id, CameraParameter parm) {
 		if (IDtoCamPtr(id) != nullptr)
 		{
@@ -64,6 +82,16 @@ namespace sm {
 		}
 		else
 		{
+			return -1;
+		}
+	}
+
+	int CameraManager::SetShootParams(CameraID id)
+	{
+		if (IDtoCamPtr(id) != nullptr) {
+			return IDtoCamPtr(id)->SetShootParams();
+		}
+		else {
 			return -1;
 		}
 	}

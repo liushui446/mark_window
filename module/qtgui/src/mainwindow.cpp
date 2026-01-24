@@ -43,6 +43,8 @@
 #include <pylon/PylonIncludes.h>
 #include <pylon/usb/BaslerUsbInstantCamera.h>
 #include "camera/CameraManager.hpp"
+#include "process/CVisionInterface.hpp"
+#include <qtgui/ImageTransform.hpp>
 
 
 
@@ -1848,13 +1850,33 @@ void MainWindow::updateZoom(QGraphicsView* view, double& factor, double scale)
 void MainWindow::mousePressEvent(QMouseEvent* event)
 {
     QPointF scenePos = ui->graphicsView->mapToScene(event->pos());
-    qDebug() << "点击位置：" << scenePos;
+    //qDebug() << "点击位置：" << scenePos;
     QMainWindow::mousePressEvent(event);
 }
 
 void MainWindow::on_Camera_test()
 {
     //sm::CameraManager::GetInstance().UseCameraDemo();
+    cv::Mat img;
+    sm::CVisionInterface::Ins().CameraCapture(img);
+
+    QPixmap qpimage = QPixmap::fromImage(cvMat2QImage(img));
+
+    if (!scene2) {
+        scene2 = new QGraphicsScene(this);
+        ui->graphicsView_2->setScene(scene2);
+        ui->graphicsView_2->setDragMode(QGraphicsView::ScrollHandDrag);
+        ui->graphicsView_2->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
+    }
+    else {
+        scene2->clear();
+    }
+
+    pixmapItem2 = scene2->addPixmap(qpimage);
+    scene2->setSceneRect(qpimage.rect());
+
+    ui->graphicsView_2->resetTransform();
+    ui->graphicsView_2->fitInView(pixmapItem2, Qt::KeepAspectRatio);
 }
 
 void MainWindow::SearchAndConnectCamera()

@@ -13,17 +13,19 @@ using namespace cv;
 namespace sm {
     
 	//********************** 图像接口Base类 **********************
-	class SM_EXPORTS CVisionProcessBase
+	class SM_EXPORTS CVisionInterface
 	{
-	protected:
-		CVisionProcessBase();
-		~CVisionProcessBase();
+	public:
+		static CVisionInterface& Ins();
+		~CVisionInterface();
 
 	public:
-		CVisionProcessBase(const CVisionProcessBase&) = delete;
-		CVisionProcessBase(CVisionProcessBase&&) = delete;
-		CVisionProcessBase& operator=(const CVisionProcessBase&) = delete;
-		CVisionProcessBase& operator=(CVisionProcessBase&&) = delete;
+		CVisionInterface(const CVisionInterface&) = delete;
+		CVisionInterface(CVisionInterface&&) = delete;
+		CVisionInterface& operator=(const CVisionInterface&) = delete;
+		CVisionInterface& operator=(CVisionInterface&&) = delete;
+
+		CVisionInterface();
 
 	public:
 		// 初始化

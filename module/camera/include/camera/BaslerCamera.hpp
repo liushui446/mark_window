@@ -18,7 +18,7 @@ namespace sm
 	class BaslerCamera : public CCameraBase
 	{
 	public:
-		BaslerCamera();
+		BaslerCamera(CameraID id);
 		~BaslerCamera() override;
 
 		struct BaslerPimple
@@ -30,6 +30,16 @@ namespace sm
 			CameraConfig camerainfo;
 
 			std::atomic <uchar*> data; //图像数据指针(暂存)
+
+			BaslerPimple()
+			{
+				id = CameraID::CAMERA_ID_NONE;
+				serialNumber = "";
+				szName = "";
+				m_hDevHandle = nullptr;
+				data = nullptr;
+			}
+			~BaslerPimple() {};
 		};
 
 		//相机初始化
@@ -58,6 +68,9 @@ namespace sm
 
 		//获取图片数据
 		int GetCameraData(unsigned char* data) override;
+
+		//设置捕获图像参数
+		int SetShootParams();
 
 		//保存最近一张图片
 		int SaveImage(ImageType imagetype) override;

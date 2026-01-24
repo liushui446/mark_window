@@ -23,7 +23,9 @@ namespace sm {
 	public:
 		static CameraManager& GetInstance();//单例
 		CameraManager();
-		~CameraManager();	
+		~CameraManager();
+
+		int Init(CameraID id);
 
 		//软触发
 		int SoftWareTrigger(CameraID id);
@@ -36,6 +38,8 @@ namespace sm {
 
 		//获取相机参数
 		int GetParaInt(CameraID id, CameraParameter parm);
+
+		int SetShootParams(CameraID id);
 
 		//获取图像数据
 		int GetCameraData(CameraID id, unsigned char* data);
