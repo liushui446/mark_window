@@ -251,7 +251,7 @@ MainWindow::MainWindow(QWidget* parent)
     // 初始化日志模型
     logModel = new QStringListModel(this);
     ui->listView_log->setModel(logModel);
-    showMaximized();
+    //showMaximized();
 }
 // 添加框选事件处理函数
 void MainWindow::onFirstViewRectSelected(const QRectF& rect)
@@ -583,7 +583,7 @@ void MainWindow::on_pushButton_clicked()
 
     // 更新按钮文字
     QTextCodec* codec = QTextCodec::codecForName("GBK");//添加编码格式
-    ui->pushButton->setText(showingBinary ? codec->toUnicode("真实显示") : codec->toUnicode("二值化"));
+    //ui->pushButton->setText(showingBinary ? codec->toUnicode("真实显示") : codec->toUnicode("二值化"));
 
     // 保持图像适应视图
     ui->graphicsView->fitInView(pixmapItem, Qt::KeepAspectRatio);
@@ -877,15 +877,26 @@ void MainWindow::on_pushButton_2_clicked()
             double time_ms = 0.0;
             float similarity = 0.0f;
 
-            bool success = RunMarkMatchingSingle(
-                tempPath.toStdString().c_str(),
-                outputPath.toStdString().c_str(),
-                &offset_x, &offset_y, &offset_r,
-                &similarity, &time_ms,
-                &threshold,
-                &roi  // 传入自定义MarkRect的地址（关键修改）
-            );
-
+            //bool success = RunMarkMatchingSingle(
+            //    tempPath.toStdString().c_str(),
+            //    outputPath.toStdString().c_str(),
+            //    &offset_x, &offset_y, &offset_r,
+            //    &similarity, &time_ms,
+            //    &threshold,
+            //    &roi  // 传入自定义MarkRect的地址（关键修改）
+            //);
+            // 
+            ///////////
+            NccRect roi0;
+            roi0.x = roi.x;
+            roi0.y = roi.y;
+            roi0.width = roi.width;
+            roi0.height = roi.height;
+            NccMatchResult result0;
+            const char* xmlPath = "edge_points.xml";
+            bool success = Region_PerformMatching(tempPath.toStdString().c_str(), outputPath.toStdString().c_str(), &roi0, &result0);
+            offset_x = result0.x;
+            offset_y = result0.y;
             if (success) {
                 offset_r -= threshold - 6;
                 std::string utf8FilePath = filePath.toUtf8().toStdString();
@@ -932,7 +943,7 @@ void MainWindow::on_pushButton_2_clicked()
                     ui->graphicsView_2->setScene(scene2);
                     ui->graphicsView_2->fitInView(item, Qt::KeepAspectRatio);
                 }
-                drawFeatureTrajectory(features, offset_x, offset_y, offset_r, Qt::red);
+                //drawFeatureTrajectory(features, offset_x, offset_y, offset_r, Qt::red);
 
             }
             else {
@@ -1020,10 +1031,10 @@ void MainWindow::on_pushButton_2_clicked()
         roi1.height = roi.height;
         NccMatchResult result1;
         const char* xmlPath = "edge_points.xml";
-        bool success = NCC_PerformMatching(tempInputPath.toStdString().c_str(), xmlPath,&roi1, &result1);
+        //bool success = NCC_PerformMatching(tempInputPath.toStdString().c_str(), xmlPath,&roi1, &result1);
         
         //////////////////////////////////////////
-        
+        bool success = Region_PerformMatching(tempInputPath.toStdString().c_str(), xmlPath, &roi1, &result1);
         //
         // 运行匹配（传入自定义ROI）
         double offset_x = 0.0, offset_y = 0.0, offset_r = 0.0;
@@ -1047,11 +1058,11 @@ void MainWindow::on_pushButton_2_clicked()
         if (success) {
             //offset_r -= threshold - 6;
             // 更新UI显示
-            ui->lineEdit_5->setText(QString::number(offset_x, 'f', 3));
+  /*          ui->lineEdit_5->setText(QString::number(offset_x, 'f', 3));
             ui->lineEdit_6->setText(QString::number(offset_y, 'f', 3));
             ui->lineEdit_7->setText(QString::number(offset_r, 'f', 3));
             ui->lineEdit_8->setText(QString::number(time_ms, 'f', 3));
-            ui->lineEdit_9->setText(QString::number(similarity, 'f', 3));
+            ui->lineEdit_9->setText(QString::number(similarity, 'f', 3))*/;
           /*  QMessageBox::information(this, codec->toUnicode("匹配成功"),
                 codec->toUnicode("匹配结果已保存并显示。"));*/
             loadImageToSecondView(tempInputPath);
@@ -1061,6 +1072,16 @@ void MainWindow::on_pushButton_2_clicked()
                 .arg(offset_r, 0, 'f', 3)
                 .arg(similarity, 0, 'f', 3)
                 .arg(time_ms, 0, 'f', 3));
+
+            // 将结果添加到表格中
+            int row = ui->tableWidget_results->rowCount();
+            ui->tableWidget_results->insertRow(row);
+            ui->tableWidget_results->setItem(row, 0, new QTableWidgetItem(codec->toUnicode("匹配结果")));
+            ui->tableWidget_results->setItem(row, 1, new QTableWidgetItem(QString::number(offset_x, 'f', 3)));
+            ui->tableWidget_results->setItem(row, 2, new QTableWidgetItem(QString::number(offset_y, 'f', 3)));
+            ui->tableWidget_results->setItem(row, 3, new QTableWidgetItem(QString::number(offset_r, 'f', 3)));
+            ui->tableWidget_results->setItem(row, 4, new QTableWidgetItem(QString::number(similarity * 100.0, 'f', 2)));
+            ui->tableWidget_results->setItem(row, 5, new QTableWidgetItem(QString::number(time_ms, 'f', 3)));
 
             // 绘制特征点（使用相对路径）
             /*QVector<QPointF> features;
@@ -1085,7 +1106,8 @@ void MainWindow::on_pushButton_2_clicked()
             }*/
             //offset_r -= threshold - 6;
             //drawFeatureTrajectory(features, offset_x, offset_y, -offset_r, Qt::red);
-            drawFeatureTrajectory(offset_x, offset_y, -offset_r, Qt::red);
+            
+            //drawFeatureTrajectory(offset_x, offset_y, -offset_r, Qt::red);
 
         }
         else {
@@ -1095,6 +1117,7 @@ void MainWindow::on_pushButton_2_clicked()
         }
     }
 }
+
 //选择文件夹
 void MainWindow::on_pushButton_4_clicked()
 {
@@ -1310,9 +1333,9 @@ void MainWindow::on_pushButton_11_clicked()
     double scale = 0.017;
     int offset = ok_roi ? static_cast<int>(mm / scale) : 0;
 
-    // 1. 获取测试次数（从lineEdit_12读取）
+    // 1. 获取测试次数（从lineEdit_12读取）改成lineEdit_8
     bool isNumber;
-    int testCount = ui->lineEdit_12->text().toInt(&isNumber);
+    int testCount = ui->lineEdit_8->text().toInt(&isNumber);
     if (!isNumber || testCount <= 0) {
         QMessageBox::warning(this, codec->toUnicode("输入错误"),
             codec->toUnicode("请在输入框中填写有效的正整数作为测试次数！"));
