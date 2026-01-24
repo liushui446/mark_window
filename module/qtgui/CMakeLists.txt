@@ -21,7 +21,7 @@ file(GLOB SRC_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp)
 	
 # Add a library with the above sources
-add_library(${PROJECT_NAME} SHARED src/gui.cpp src/mainwindow.cpp src/ImageWindow.cpp src/selectablegraphicsview.cpp)
+add_library(${PROJECT_NAME} SHARED src/gui.cpp src/mainwindow.cpp src/ImageWindow.cpp src/selectablegraphicsview.cpp )
 add_library(sub::qtgui ALIAS ${PROJECT_NAME})
 
 

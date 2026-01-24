@@ -58,6 +58,12 @@ extern "C" {
         NccMatchResult* result
     );
 
+    NCC_MATCH_API bool Region_PerformMatching(
+        const char* testImagePath,
+        const char* edgeXmlPath,
+        const NccRect* roi,
+        NccMatchResult* result
+    );
     /**
      * @brief 设置Canny边缘检测参数
      * @param thresh1 低阈值

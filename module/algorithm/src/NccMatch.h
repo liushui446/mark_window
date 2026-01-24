@@ -127,6 +127,21 @@ public:
     size_t getTemplateCount() const { return spatialTemplates_.size(); }
     std::vector<cv::Mat> getFourierTemplates() const { return fourierTemplates_; }
     cv::Mat getLastEdgeImage() const { return lastEdgeImage_; }
+    /////////////////////////////////////
+    bool Region_test(
+        const cv::Mat& grayImage,
+        const std::string& edgeXmlPath,  // 新增：边缘点XML路径
+        cv::Point2f& bestLoc,
+        float& bestAngle,
+        double& bestScore
+    );
 
+    bool Region_test_subpix(
+        const cv::Mat& grayImage,
+        const std::string& edgeXmlPath,  // 新增：边缘点XML路径
+        cv::Point2f& bestLoc,
+        float& bestAngle,
+        double& bestScore
+    );
 
 };
