@@ -53,6 +53,7 @@ typedef unsigned int        UINT;
 typedef unsigned char uchar;
 typedef unsigned short ushort;
 
+
 #define	MARK_SUM (40)		// Mark点数
 
 #define PI 3.141592653589793238462643383
