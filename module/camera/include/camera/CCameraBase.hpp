@@ -67,6 +67,10 @@ namespace sm {
 		//保存图像
 		virtual int SaveImage(ImageType imagetype) = 0;
 
+		//停止实时采集
+		virtual int StopGrabbing() = 0;
+
+		virtual int StartGrabbing() = 0;
 	};
 
 	typedef shared_ptr<CCameraBase> CameraPtr;

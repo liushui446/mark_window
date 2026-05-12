@@ -262,7 +262,7 @@ bool detectBoxinBox(const Mat& image, vector<RectangleInfo>& rectInfos, int& min
     // 使用双边滤波减少噪声
     cv::Mat smoothedImage2, edges2;
     cv::bilateralFilter(preprocessedImage, smoothedImage2, 9, 75, 75);
-    cv::Canny(smoothedImage2, edges2, 170, 200, 3, true);
+    cv::Canny(binary, edges2, 170, 200, 3, true);
     // 5. 轮廓检测：使用RETR_CCOMP获取所有层次轮廓（包括内部轮廓）
     vector<vector<Point>> contours;
     vector<Vec4i> hierarchy;
@@ -297,6 +297,10 @@ bool detectBoxinBox(const Mat& image, vector<RectangleInfo>& rectInfos, int& min
         if (area > maxarea)
             maxarea = area;
     }
+    Mat gray_3c;
+    // 关键：灰度图 → 3通道BGR图（核心API，直接复制）
+    cv::Mat display_img = image.clone();
+    cvtColor(display_img, gray_3c, COLOR_GRAY2BGR);
     for (size_t i = 0; i < contours.size(); i++) {
         // 获取最小外接矩形
         RotatedRect rotatedRect = minAreaRect(contours[i]);
@@ -318,13 +322,9 @@ bool detectBoxinBox(const Mat& image, vector<RectangleInfo>& rectInfos, int& min
         rotatedRect.points(vertices);
 
         // 绘制旋转矩形（使用红色）
-        // 注意：如果gray是单通道灰度图，Scalar只需一个参数；如果是BGR图则需要三个参数(0,0,255)
-        Mat gray_3c;
-        // 关键：灰度图 → 3通道BGR图（核心API，直接复制）z
-        cvtColor(image, gray_3c, COLOR_GRAY2BGR);
         for (int j = 0; j < 4; j++) {
             // 单通道灰度图用红色（255）
-            line(image, vertices[j], vertices[(j + 1) % 4], Scalar(0), 1);
+            line(display_img, vertices[j], vertices[(j + 1) % 4], Scalar(0), 1);
 
             // 如果是BGR彩色图，使用下面这行
             line(gray_3c, vertices[j], vertices[(j + 1) % 4], Scalar(0, 0, 255), 1);

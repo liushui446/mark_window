@@ -48,6 +48,11 @@ namespace sm {
 
 		int UseCameraDemo();
 
+		int StopGrabbing(CameraID id);
+
+		int StartGrabbing(CameraID id);
+
+		int CloseDevice(CameraID id);
 		//CameraID转相机实例对象
 		inline CameraPtr IDtoCamPtr(CameraID id)
 		{

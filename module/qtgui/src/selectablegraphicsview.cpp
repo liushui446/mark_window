@@ -17,6 +17,12 @@ SelectableGraphicsView::SelectableGraphicsView(QWidget* parent)
     setDragMode(QGraphicsView::ScrollHandDrag);
     setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
     createContextMenu();
+    // 关键：设置视图不接受鼠标事件
+    setAttribute(Qt::WA_TransparentForMouseEvents, false);
+    viewport()->setAttribute(Qt::WA_TransparentForMouseEvents, false);
+
+    // 安装事件过滤器
+    installEventFilter(this);
 }
 
 SelectableGraphicsView::~SelectableGraphicsView()
@@ -33,10 +39,12 @@ QRectF SelectableGraphicsView::getSelectedRect() const
 void SelectableGraphicsView::clearSelection()
 {
     if (selectionRect) {
-        if (scene() ) {
+        // 先检查是否在场景中，再移除
+        if (scene() && scene()->items().contains(selectionRect)) {
             scene()->removeItem(selectionRect);
         }
-        delete selectionRect;
+        // 然后安全删除
+       // delete selectionRect;
         selectionRect = nullptr;
     }
     selectedRect = QRectF();
@@ -298,4 +306,10 @@ void SelectableGraphicsView::onCancelBinaryAction()
             codec->toUnicode("已取消选中区域的二值化")
         );
     }
+}
+
+bool SelectableGraphicsView::eventFilter(QObject* watched, QEvent* event)
+{
+    // 不拦截任何事件，让父窗口处理
+    return false;
 }

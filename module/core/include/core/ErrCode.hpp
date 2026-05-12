@@ -8,8 +8,8 @@ namespace sm
 		// Common error code
 		OK = 0x0000,
 		SUCCESS = 0x0000,
-		FAIL = 0xA001
-
+		FAIL = 0xA001,
+		ERROR_CAMERA_CAPTURE= 0xA005
 	};
 }
 

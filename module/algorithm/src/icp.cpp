@@ -54,72 +54,7 @@ namespace sm {
                 }
             }
 
-            //template<class Scene>
-            //RegistrationResult ICP2D_Point2Plane(std::vector<Vec2f>& model_pcd, const Scene scene,
-            //    const ICPConvergenceCriteria criteria)
-            //{
-            //    RegistrationResult result;
-            //    RegistrationResult backup;
-
-            //    std::vector<float> A_host(9, 0);
-            //    std::vector<float> b_host(3, 0);
-            //    thrust__pcd2Ab<Scene> trasnformer(scene);
-
-            //    // use one extra turn
-            //    for (uint32_t iter = 0; iter <= criteria.max_iteration_; iter++) {
-
-            //        //Vec11f reducer;
-            //        Vec11f reducer = Vec11f::Zero();
-            //        //#pragma omp declare reduction( + : Vec11f : omp_out += omp_in) \
-            //                               //initializer (omp_priv = Vec11f::Zero())
-
-            //        //#pragma omp parallel for reduction(+: reducer)
-            //        for (int pcd_iter = 0; pcd_iter < model_pcd.size(); pcd_iter++) {
-            //            Vec11f result = trasnformer(model_pcd[pcd_iter]);
-            //            reducer += result;
-            //        }
-
-            //        Vec11f& Ab_tight = reducer;
-
-            //        backup = result;
-
-            //        float& count = Ab_tight[10];
-            //        float& total_error = Ab_tight[9];
-            //        if (count == 0) return result;  // avoid divid 0
-
-            //        result.fitness_ = float(count) / model_pcd.size();
-            //        result.inlier_rmse_ = std::sqrt(total_error / count);
-
-            //        // last extra iter, just compute fitness & mse
-            //        if (iter == criteria.max_iteration_) return result;
-
-            //        if (std::abs(result.fitness_ - backup.fitness_) < criteria.relative_fitness_ &&
-            //            std::abs(result.inlier_rmse_ - backup.inlier_rmse_) < criteria.relative_rmse_) {
-            //            return result;
-            //        }
-
-            //        for (int i = 0; i < 3; i++) b_host[i] = Ab_tight[6 + i];
-
-            //        int shift = 0;
-            //        for (int y = 0; y < 3; y++) {
-            //            for (int x = y; x < 3; x++) {
-            //                A_host[x + y * 3] = Ab_tight[shift];
-            //                A_host[y + x * 3] = Ab_tight[shift];
-            //                shift++;
-            //            }
-            //        }
-
-            //        Mat3x3f extrinsic = eigen_slover_333(A_host.data(), b_host.data());
-
-            //        transform_pcd(model_pcd, extrinsic);
-            //        result.transformation_ = extrinsic * result.transformation_;
-            //    }
-
-            //    // never arrive here
-            //    return result;
-            //}
-            //限制距离在1个像素内
-            // 2D点到面ICP核心函数【像素级约束改造版】
+            
             template<class Scene>
             RegistrationResult ICP2D_Point2Plane(std::vector<Vec2f>& model_pcd, const Scene scene,
                 const ICPConvergenceCriteria criteria)
@@ -171,37 +106,11 @@ namespace sm {
 
                     Mat3x3f extrinsic = eigen_slover_333(A_host.data(), b_host.data());
 
-                    // ==============================================
-                    // ✅ 终极修复：适配sm::imgproc矩阵库 正确访问平移分量
-                    // ✅ 彻底解决C2440 vec<3,float> → float 转换错误
-                    // ==============================================
-                    // ✅ 正确写法：Mat3x3f是【行优先】存储 → 每行是一个vec<3,float>
-                    // ✅ extrinsic[行索引][列索引] 才能拿到单个float值
-                    //float tx = extrinsic[0][2];  // ✔️ 0行2列 → X方向平移量（像素）
-                    //float ty = extrinsic[1][2];  // ✔️ 1行2列 → Y方向平移量（像素）
-
-                    //// ✅ 严格1像素平移约束（核心逻辑不变，绝对生效）
-                    //const float translate_len = std::sqrt(tx * tx + ty * ty);
-                    //if (translate_len > ONE_PIXEL_LIMIT)
-                    //{
-                    //    const float scale_factor = ONE_PIXEL_LIMIT / translate_len;
-                    //    // ✅ 回写约束后的平移量到矩阵（同正确访问方式）
-                    //    extrinsic[0][2] = tx * scale_factor;
-                    //    extrinsic[1][2] = ty * scale_factor;
-                    //}
-
+                   
                     // 执行约束后的点云变换 + 累积总变换
                     transform_pcd(model_pcd, extrinsic);
                     result.transformation_ = extrinsic * result.transformation_;
-                    /*float total_tx = result.transformation_[0][2];
-                    float total_ty = result.transformation_[1][2];
-                    float total_dist = std::sqrt(total_tx * total_tx + total_ty * total_ty);
-                    if (total_dist > ONE_PIXEL_LIMIT)
-                    {
-                        float total_scale = ONE_PIXEL_LIMIT / total_dist;
-                        result.transformation_[0][2] = total_tx * total_scale;
-                        result.transformation_[1][2] = total_ty * total_scale;
-                    }*/
+                   
                 }
 
                 return result;

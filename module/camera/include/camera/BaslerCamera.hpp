@@ -2,7 +2,15 @@
 #define BASLERCAMERA_HPP
 
 #include "camera/CCameraBase.hpp"
-
+namespace Pylon {
+	class CBaslerUsbInstantCamera;
+	class CImageFormatConverter;
+	class CPylonImage;
+}
+#include <atomic>
+#include <mutex>
+#include <thread>
+#include <opencv2/opencv.hpp>
 namespace sm
 {
 	//struct BaslerCamera::BaslerPimple
@@ -83,9 +91,25 @@ namespace sm
 
 		//关闭相机
 		int CloseDevice() override;
+		
+		//停止实时采集
+		int StopGrabbing() override;
 
-
+		//开始实时采集
+		int StartGrabbing() override;   // 新增
 	private:
+		// 连续抓图的后台线程函数
+		void GrabLoop();
+
+		// Pylon 相机对象（使用智能指针避免头文件依赖）
+		std::unique_ptr<Pylon::CBaslerUsbInstantCamera> m_camera;
+		std::unique_ptr<Pylon::CImageFormatConverter> m_converter;
+		std::unique_ptr<Pylon::CPylonImage> m_pylonImage;
+
+		cv::Mat m_frame;              // 最新一帧（BGR格式）
+		std::mutex m_frameMutex;      // 保护 m_frame
+		std::thread m_grabThread;     // 后台抓图线程
+		std::atomic<bool> m_grabbing; // 控制抓图线程运行
 		//struct BaslerPimple;
 		shared_ptr<BaslerPimple> pBaslerMember;
 	};

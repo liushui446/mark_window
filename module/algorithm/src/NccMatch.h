@@ -15,9 +15,18 @@ private:
     double cannyThresh2_;  // 高阈值
     int cannyApertureSize_; //  aperture尺寸
     bool cannyL2gradient_;  // 是否使用L2梯度
-
     // 轮廓过滤参数
     double contourAreaThresh_;  // 最小轮廓面积
+
+
+    bool   templatesBuilt_ = false;   // 边缘模板是否已建
+    cv::Size lastRefSize_;             // 上次准备的参考图尺寸
+    // 把 generateTemplates1 拆开后内部用：
+    std::vector<cv::Mat>   alignedTemplates_;     // 各角度对齐后的空间模板
+    std::vector<cv::Point2f> baseSubedgePoints_;  // 基坐标系亚像素点（旋转用）
+    std::vector<cv::Point>   baseEdgePoints_;     // 基坐标系像素点
+    int  baseW_ = 0, baseH_ = 0;
+    cv::Point2f origTempCenter_;
 
     cv::Size maxTemplateSize_;
     cv::Mat downsampledRefImage_;
@@ -59,15 +68,16 @@ public:
         double cannyThresh1 = 120, double cannyThresh2 = 200,
         double contourAreaThresh = 8.0);
 
-    // 参数设置接口
-    void setAngleParams(int angleStep, int minAngle, int maxAngle);
-    void setCannyParams(double thresh1, double thresh2, int apertureSize = 3, bool L2gradient = true);
-    void setContourAreaThreshold(double threshold);
+
+    void robustCanny(const cv::Mat& gray, cv::Mat& edges);
+    bool prepareForImage(const cv::Mat& refImage);
+    bool buildAngleTemplates(const std::vector<cv::Point2f>& edgePoints,
+        const std::vector<cv::Point2f>& subedgePoints);
 
     // 模板生成接口（不使用ROI）
     bool generateTemplates(const std::vector<cv::Point>& edgePoints, std::vector<cv::Point2f>& subedgePoints,const cv::Mat& refImage);
     //优化时间
-    bool generateTemplates1(const std::vector<cv::Point>& edgePoints, std::vector<cv::Point2f>& subedgePoints, const cv::Mat& refImage);
+    bool generateTemplates1(const std::vector<cv::Point2f>& edgePoints, std::vector<cv::Point2f>& subedgePoints, const cv::Mat& refImage);
     bool generateTemplateAndSaveEdgePoints(const cv::Mat& grayImage, const std::string& edgeXmlPath);
    // bool loadEdgePointsAndGenerateTemplates(const std::string& edgeXmlPath);
 
@@ -102,7 +112,12 @@ public:
         float& bestAngle,
         double& bestScore
     );
-    
+    bool NccMatch::runFullMatchingFromPath_zero(
+        const cv::Mat& grayImage,
+        const std::string& edgeXmlPath,
+        cv::Point2f& bestLoc,
+        float& bestAngle,
+        double& bestScore);
     /**
      * @brief 从已加载的灰度图执行完整匹配流程（匹配→解析结果）
      * @param testGray 已加载的单通道灰度图（CV_8UC1）
@@ -129,19 +144,18 @@ public:
     cv::Mat getLastEdgeImage() const { return lastEdgeImage_; }
     /////////////////////////////////////
     bool Region_test(
-        const cv::Mat& grayImage,
-        const std::string& edgeXmlPath,  // 新增：边缘点XML路径
+        const cv::Mat& testImage,
+        const std::string& edgeXmlPath,
         cv::Point2f& bestLoc,
         float& bestAngle,
-        double& bestScore
-    );
+        double& bestScore,
+        int markType);  // 新增markType参数
 
-    bool Region_test_subpix(
-        const cv::Mat& grayImage,
-        const std::string& edgeXmlPath,  // 新增：边缘点XML路径
-        cv::Point2f& bestLoc,
-        float& bestAngle,
-        double& bestScore
-    );
-
+    double CaluateLine2Line(std::vector<cv::Point2f> line1, std::vector<cv::Point2f> line2);//2条线段距离
+    double CaluateLine2LinePCA(const std::vector<cv::Point2f>& line1,
+        const std::vector<cv::Point2f>& line2);
+    bool Roi_extract(const cv::Mat& grayImage,std::vector<cv::Rect>& regions);
+    bool AIM_Roi_extract(const cv::Mat& grayImage, std::vector<cv::Rect>& regions);
+    double ExOntoTest(cv::Mat img, std::vector<std::vector<double>>& vecMagn, std::vector<cv::Rect>& regions);
+    double ExOntoTest1(cv::Mat img, std::vector<std::vector<double>>& vecMagn, std::vector<cv::Rect>& regions);
 };

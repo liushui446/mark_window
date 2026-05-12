@@ -257,7 +257,14 @@ MainWindow::MainWindow(QWidget* parent)
     // 初始化日志模型
     logModel = new QStringListModel(this);
     ui->listView_log->setModel(logModel);
-    //showMaximized();
+    this->showFullScreen();
+
+    // 移除最小化按钮
+    setWindowFlags(windowFlags()  & ~Qt::WindowMaximizeButtonHint);
+    /*connect(ui->pushButton_detailsDontCare, &QPushButton::clicked,
+        this, &MainWindow::on_pushButton_detailsDontCare_clicked);*/
+
+    sm::CVisionInterface::Ins().Init();   // 只初始化一次
 }
 // 添加框选事件处理函数
 void MainWindow::onFirstViewRectSelected(const QRectF& rect)
@@ -328,12 +335,7 @@ void MainWindow::onSecondViewMenuAction(const QString& action)
         appendLog(codec->toUnicode("第二个视图：已清除选中区域"));
     }
 }
-// 确保在MainWindow头文件中添加这些声明
-/*
-private slots:
-    void onFirstViewRectSelected(const QRectF &rect);
-    void onSecondViewRectSelected(const QRectF &rect);
-*/
+
 
 MainWindow::~MainWindow()
 {
@@ -374,25 +376,25 @@ void MainWindow::on_actionw_triggered()
 }
 void MainWindow::on_pushButton_3_clicked()
 {
-    QString filePath = QFileDialog::getOpenFileName(
+   filePath_orgin = QFileDialog::getOpenFileName(
         this,
         "",  
         "",
         "Images (*.png *.jpg *.bmp)"
     );
 
-    if (!filePath.isEmpty()) {
+    if (!filePath_orgin.isEmpty()) {
         // 显示在 lineEdit 上
-        ui->lineEdit->setText(filePath);
+        ui->lineEdit->setText(filePath_orgin);
 
         // 加载显示图片
-        loadImage(filePath);
+        loadImage(filePath_orgin);
     }
 }
 void MainWindow::on_pushButton_8_clicked()
 {
     // 选择图像文件
-    QString filePath = QFileDialog::getOpenFileName(
+    filePath = QFileDialog::getOpenFileName(
         this,
         "",
         "",
@@ -571,6 +573,70 @@ QPixmap MainWindow::generateBinaryPixmap(const QPixmap& pixmap)
     return QPixmap::fromImage(binImg.copy());
 }
 
+MarkRect calculateROI(const cv::Mat& mat, bool hasSelectedRoi, const QRectF& selectedRoi) {
+    MarkRect roi;
+
+    if (hasSelectedRoi && !selectedRoi.isEmpty()) {
+        // 使用选中区域作为ROI
+        int x = static_cast<int>(qRound(selectedRoi.x()));
+        int y = static_cast<int>(qRound(selectedRoi.y()));
+        int width = static_cast<int>(qRound(selectedRoi.width()));
+        int height = static_cast<int>(qRound(selectedRoi.height()));
+
+        // 边界检查
+        x = qMax(0, x);
+        y = qMax(0, y);
+        width = qMin(mat.cols - x, width);
+        height = qMin(mat.rows - y, height);
+        width = qMax(10, width);
+        height = qMax(10, height);
+
+        roi.x = x;
+        roi.y = y;
+        roi.width = width;
+        roi.height = height;
+
+        qDebug() << "使用选中ROI: 位置(" << x << "," << y << ") 大小(" << width << "×" << height << ")";
+    }
+    else {
+        // 无选中区域，使用整个图像
+        roi.x = 0;
+        roi.y = 0;
+        roi.width = mat.cols;
+        roi.height = mat.rows;
+
+        qDebug() << "使用全图ROI: 大小(" << mat.cols << "×" << mat.rows << ")";
+    }
+
+    return roi;
+}
+
+int MainWindow::convertMarkTypeToInt(const QString& markTypeStr)
+{
+    QTextCodec* codec = QTextCodec::codecForName("GBK");
+    QString decodedStr = codec->toUnicode(markTypeStr.toUtf8());
+
+    // 根据之前讨论的晶圆标记类型进行映射
+    if (markTypeStr == "Cross Mark") {
+        return 0; // Cross Mark
+    }
+    else if (markTypeStr == "Bar-in-Bar") {
+        return 1; // Bar-in-Bar
+    }
+    else if (markTypeStr == "Box-in-Box") {
+        return 2; // Box-in-Box
+    }
+    else if (markTypeStr == "Frame-in-Frame") {
+        return 3; // Frame-in-Frame
+    }
+    else if (markTypeStr == "AIM") {
+        return 4; // AIM (Advanced Imaging Mark)
+    }
+    else {
+        // 默认返回0
+        return 0;
+    }
+}
 
 void MainWindow::on_pushButton_clicked()
 {
@@ -598,115 +664,128 @@ void MainWindow::on_pushButton_clicked()
 void MainWindow::on_pushButton_5_clicked()
 {
     QTextCodec* codec = QTextCodec::codecForName("GBK");  // 编码格式
-    if (!pixmapItem) {
-        QMessageBox::warning(this, codec->toUnicode("提示"), codec->toUnicode("请先加载图像！"));
-        return;
-    }
-
+    bool result = 0;
+    QString tempInputPath;
+    MarkRect roi;
     // 记录开始时间
     qint64 startTime = QDateTime::currentMSecsSinceEpoch();
+    //离线测试
+    if (onlinetest == 0) {
+        
+        if (!pixmapItem) {
+            QMessageBox::warning(this, codec->toUnicode("提示"), codec->toUnicode("请先加载图像！"));
+            return;
+        }
 
-    // 原图转换成 BGR 图像（cv::Mat）
-    //QImage image = originalPixmap.toImage().convertToFormat(QImage::Format_RGB888);
-    QImage image = originalPixmap.toImage().convertToFormat(QImage::Format_RGB888);
-    cv::Mat mat(image.height(), image.width(), CV_8UC3, (void*)image.bits(), image.bytesPerLine());
-    if (mat.empty()) {
-        QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("图像转换失败！"));
-        return;
-    }
+        // 原图转换成 BGR 图像（cv::Mat）
+        //QImage image = originalPixmap.toImage().convertToFormat(QImage::Format_RGB888);
+        QImage image = originalPixmap.toImage().convertToFormat(QImage::Format_RGB888);
+        cv::Mat mat(image.height(), image.width(), CV_8UC3, (void*)image.bits(), image.bytesPerLine());
+        if (mat.empty()) {
+            QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("图像转换失败！"));
+            return;
+        }
 
-    // 确保临时目录存在并保存临时图像
-    QString tempInputPath = QCoreApplication::applicationDirPath() + "/temp_input.jpg";
-    if (!cv::imwrite(tempInputPath.toStdString(), mat)) {
-        QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("临时图像保存失败！"));
-        return;
-    }
+        // 确保临时目录存在并保存临时图像
+         tempInputPath = QCoreApplication::applicationDirPath() + "/temp_input.jpg";
+        if (!cv::imwrite(tempInputPath.toStdString(), mat)) {
+            QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("临时图像保存失败！"));
+            return;
+        }
 
-    // ✅ 读取二值化阈值（范围检查优化）
-    bool ok_thresh = false;
-    double threshold = ui->lineEdit_3->text().toDouble(&ok_thresh);
-    if (!ok_thresh || threshold < 0 || threshold > 255) {
-        threshold = 128.0;  // 默认值
-        appendLog(codec->toUnicode("二值化阈值无效，使用默认值 128"));
-    }
-    else {
-        appendLog(QString(codec->toUnicode("使用二值化阈值: %1")).arg(threshold));
-    }
+        // ✅ 读取二值化阈值（范围检查优化）
+        bool ok_thresh = false;
+        double threshold = ui->lineEdit_3->text().toDouble(&ok_thresh);
+        if (!ok_thresh || threshold < 0 || threshold > 255) {
+            threshold = 128.0;  // 默认值
+            appendLog(codec->toUnicode("二值化阈值无效，使用默认值 128"));
+        }
+        else {
+            appendLog(QString(codec->toUnicode("使用二值化阈值: %1")).arg(threshold));
+        }
 
-    // ✅ 计算并转换ROI区域（核心修改：适配自定义MarkRect）
-    MarkRect roi;  // 使用自定义ROI结构体（替代cv::Rect）
-    bool useSelectedRoi = false;
+        // 计算ROI偏移量
+        roi = calculateROI(mat, hasSelectedRoi, selectedRoi);
+        appendLog(QString(codec->toUnicode("使用ROI: 位置(%1,%2) 大小(%3×%4)"))
+            .arg(roi.x).arg(roi.y).arg(roi.width).arg(roi.height));
+        // 1. 生成模板
+        //const char* templatePath = "template.jpg";
+        const char* xmlPath = "edge_points.xml";
 
-    if (hasSelectedRoi && !selectedRoi.isEmpty()) {
-        // 1. 使用右键选中的区域作为ROI
-        // 将场景坐标转换为图像像素坐标（确保整数类型）
-        int x = static_cast<int>(qRound(selectedRoi.x()));
-        int y = static_cast<int>(qRound(selectedRoi.y()));
-        int width = static_cast<int>(qRound(selectedRoi.width()));
-        int height = static_cast<int>(qRound(selectedRoi.height()));
-
-        // 严格边界检查（防止超出图像范围）
-        x = qMax(0, x);
-        y = qMax(0, y);
-        width = qMin(mat.cols - x, width);  // 确保宽度不超出图像右边界
-        height = qMin(mat.rows - y, height);  // 确保高度不超出图像下边界
-        width = qMax(10, width);  // 最小宽度限制（避免过小ROI）
-        height = qMax(10, height);  // 最小高度限制
-
-        // 赋值给自定义ROI结构体
-        roi.x = x;
-        roi.y = y;
-        roi.width = width;
-        roi.height = height;
-        useSelectedRoi = true;
-        appendLog(QString(codec->toUnicode("使用选中ROI: 位置(%1,%2) 大小(%3×%4)"))
-            .arg(x).arg(y).arg(width).arg(height));
+        // 可选：调整参数 NCC模板生成，使用时取消注释
+        //NCC_SetCannyParams(150, 200);
+        //NCC_SetContourAreaThreshold(10.0);
+        NccRect roi1;
+        roi1.x = roi.x;
+        roi1.y = roi.y;
+        roi1.width = roi.width;
+        roi1.height = roi.height;
+        result = NCC_CreateTemplate(filePath_orgin.toStdString().c_str(), xmlPath, &roi1, 1, -5, 5);
     }
     else {
-        // 2. 无选中区域，使用默认正方形ROI（优化计算逻辑）
-        bool ok_roi = false;
-        double v = ui->lineEdit_4->text().toDouble(&ok_roi);
-        double scale = 0.017;
-        int offset = ok_roi ? static_cast<int>(v / scale) : 0;
+        //在线测试
+        //1获取图像
+        cv::Mat frame;
+        //APIErrCode err = sm::CVisionInterface::Ins().CameraCapture(frame);
+        //if (err != APIErrCode::SUCCESS) {
+        //    QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("相机采集失败！"));
+        //    return;
+        //}
 
-        // 计算图像中心
-        int centerX = mat.cols / 2;
-        int centerY = mat.rows / 2;
+        //// 2. 停止实时显示和相机抓图
+        //if (m_timer && m_timer->isActive()) {
+        //    m_timer->stop();
+        //    ui->pushButton_7->setText(codec->toUnicode("开始实时显示"));
+        //}
+        //sm::CVisionInterface::Ins().StopCapture();
+        /////////////////
+        QImage image = originalPixmap.toImage().convertToFormat(QImage::Format_RGB888);
+        cv::Mat mat(image.height(), image.width(), CV_8UC3, (void*)image.bits(), image.bytesPerLine());
+        frame = mat.clone();
+        ///////////////
+        // 3. 检查图像有效性
+        if (frame.empty()) {
+            QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("采集的图像为空！"));
+            return;
+        }
 
-        // 计算最大可能的正方形半边长（考虑偏移和边界）
-        int maxHalfWidth = (mat.cols - offset) / 2;
-        int maxHalfHeight = (mat.rows - offset) / 2;
-        int halfSize = min(maxHalfWidth, maxHalfHeight);
-        halfSize = max(halfSize, 50);  // 最小半边长限制（避免过小ROI）
+        // 4. 保存临时图像文件（与离线模式保持一致）
+        tempInputPath = QCoreApplication::applicationDirPath() + "/temp_input.jpg";
+        if (!cv::imwrite(tempInputPath.toStdString(), frame)) {
+            QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("临时图像保存失败！"));
+            return;
+        }
 
-        // 计算ROI坐标（确保不超出边界）
-        int x = max(0, centerX - halfSize);
-        int y = max(0, centerY - halfSize);
-        int size = min(2 * halfSize, min(mat.cols - x, mat.rows - y));  // 最终边长
+        // 5. 读取二值化阈值（如果需要，可复用离线模式的阈值逻辑）
+        bool ok_thresh = false;
+        double threshold = ui->lineEdit_3->text().toDouble(&ok_thresh);
+        if (!ok_thresh || threshold < 0 || threshold > 255) {
+            threshold = 128.0;
+            appendLog(codec->toUnicode("二值化阈值无效，使用默认值 128"));
+        }
+        else {
+            appendLog(QString(codec->toUnicode("使用二值化阈值: %1")).arg(threshold));
+        }
 
-        // 赋值给自定义ROI结构体
-        roi.x = x;
-        roi.y = y;
-        roi.width = size;
-        roi.height = size;
-        appendLog(QString(codec->toUnicode("使用默认正方形ROI: 位置(%1,%2) 大小(%3×%4)"))
-            .arg(x).arg(y).arg(size).arg(size));
+        // 6. 计算 ROI（基于采集的 frame）
+        roi = calculateROI(frame, hasSelectedRoi, selectedRoi);
+        appendLog(QString(codec->toUnicode("使用ROI: 位置(%1,%2) 大小(%3×%4)"))
+            .arg(roi.x).arg(roi.y).arg(roi.width).arg(roi.height));
+
+        // 7. 调用 NCC 创建模板（传入临时文件路径）
+        const char* xmlPath = "edge_points.xml";
+        NccRect roi1;
+        roi1.x = roi.x;
+        roi1.y = roi.y;
+        roi1.width = roi.width;
+        roi1.height = roi.height;
+
+        // 注意：filePath_orgin 可能仅用于离线模式，在线测试时直接使用临时文件路径
+        result = NCC_CreateTemplate(tempInputPath.toStdString().c_str(), xmlPath, &roi1, 1, -5, 5);
     }
-    // 1. 生成模板
-    //const char* templatePath = "template.jpg";
-    const char* xmlPath = "edge_points.xml";
+    
 
-    // 可选：调整参数 NCC模板生成，使用时取消注释
-    //NCC_SetCannyParams(150, 200);
-    //NCC_SetContourAreaThreshold(10.0);
-    NccRect roi1;
-    roi1.x = roi.x;
-    roi1.y = roi.y;
-    roi1.width = roi.width;
-    roi1.height = roi.height;
-    bool result = NCC_CreateTemplate(tempInputPath.toStdString().c_str(), xmlPath, &roi1, 1, -5, 5);
-
-
+   
     
 
     //// ✅ 模型保存路径（确保目录存在）
@@ -730,26 +809,38 @@ void MainWindow::on_pushButton_5_clicked()
         modelInitialized = false;
         // 读取并绘制特征点（路径优化）
         QVector<QPointF> features;
-        QString filePath = "generate_features.txt";  // 与算法输出路径一致
-        QFile file(filePath);
-        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            appendLog("无法打开特征点文件: " + filePath);
+        //QString filePath = "generate_features.txt";  // 与算法输出路径一致
+        //QFile file(filePath);
+        //if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        //    appendLog("无法打开特征点文件: " + filePath);
+        //}
+        //else {
+        //    QTextStream in(&file);
+        //    while (!in.atEnd()) {
+        //        double x = 0, y = 0;
+        //        in >> x >> y;
+        //        if (in.status() == QTextStream::Ok) {
+        //            features.append(QPointF(x, y));
+        //        }
+        //        else {
+        //            break;
+        //        }
+        //    }
+        //    file.close();
+        //   
+        //    appendLog(QString(codec->toUnicode("读取到 %1 个特征点")).arg(features.size()));
+        //}
+        // 清空features（如果需要）
+        features.clear();
+        sm::Core* core = sm::Core::get_init();
+        // 预留空间以提高性能
+        features.reserve(core->temp_features.size());
+
+        // 遍历并转换每个点
+        for (const auto& pt : core->temp_features) {
+            features.append(QPointF(pt.x, pt.y));
         }
-        else {
-            QTextStream in(&file);
-            while (!in.atEnd()) {
-                double x = 0, y = 0;
-                in >> x >> y;
-                if (in.status() == QTextStream::Ok) {
-                    features.append(QPointF(x, y));
-                }
-                else {
-                    break;
-                }
-            }
-            file.close();
-            appendLog(QString(codec->toUnicode("读取到 %1 个特征点")).arg(features.size()));
-        }
+        appendLog(QString(codec->toUnicode("读取到 %1 个特征点")).arg(features.size()));
         scene->clear();
         QImage originalImage(tempInputPath);
         if (!originalImage.isNull()) {
@@ -758,7 +849,7 @@ void MainWindow::on_pushButton_5_clicked()
             ui->graphicsView->setScene(scene);
             ui->graphicsView->fitInView(item, Qt::KeepAspectRatio);
         }
-        drawFeatureTrajectory1(features, 5, 5, 0, Qt::red);
+        drawFeatureTrajectory1(features, roi.x, roi.y, 0, Qt::red);
     }
     else {
  /*       QMessageBox::warning(this, codec->toUnicode("失败"),
@@ -794,138 +885,259 @@ void MainWindow::on_pushButton_2_clicked()
     if (!ok_thresh || threshold < 0 || threshold > 255) {
         threshold = 128;  // 确保为int类型（算法接口要求）
     }
+    QString algorithm = ui->comboBox_algorithm->currentText();
+    bool success = false;
+    if (onlinetest == 0)
+    {
+        // ✅ 连续测试
+        if (ui->checkBox->isChecked()) {
+            if (testImageFiles.isEmpty()) {
+                QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("请先选择连续测试文件夹！"));
+                return;
+            }
 
-    bool ok_roi = false;
-    double mm = ui->lineEdit_4->text().toDouble(&ok_roi);
-    double scale = 0.017;
-    int offset = ok_roi ? static_cast<int>(mm / scale) : 0;
+            QString resultFile = testFolderPath + "/Test_result.csv";
+            std::ofstream resultOut(resultFile.toStdString());
+            resultOut << "文件路径及文件名,测试结果,offset_X,offset_Y,offset_R,测试时间(ms),测试分数,错误代码\n";
 
-    // ✅ 连续测试
-    if (ui->checkBox->isChecked()) {
-        if (testImageFiles.isEmpty()) {
-            QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("请先选择连续测试文件夹！"));
-            return;
+            int numstest = 0;
+
+            for (const QString& filePath : testImageFiles) {
+                QImage image(filePath);
+                numstest++;
+                if (numstest > 10)
+                {
+                    break;
+                }
+                if (image.isNull()) continue;
+
+                QString tempPath = QCoreApplication::applicationDirPath() + "/temp_input.png";
+                if (!image.save(tempPath)) {
+                    appendLog(codec->toUnicode("临时图像保存失败: %1").arg(filePath));
+                    continue;
+                }
+                QString outputPath = QCoreApplication::applicationDirPath() + "/temp_result.jpg";
+
+                // 读取图像尺寸，计算 ROI（核心修改：使用自定义MarkRect）
+                //cv::Mat mat = cv::imread(tempPath.toStdString());
+                //if (mat.empty()) {
+                //    appendLog(codec->toUnicode("无法读取图像: %1").arg(filePath));
+                //    continue;
+                //}
+                QImage image1 = originalPixmap2.toImage().convertToFormat(QImage::Format_RGB888);
+                cv::Mat mat(image1.height(), image1.width(), CV_8UC3, (void*)image1.bits(), image1.bytesPerLine());
+                // 计算ROI偏移量
+                MarkRect roi = calculateROI(mat, hasSelectedRoi2, selectedRoi2);
+
+                // 运行匹配（传入自定义ROI）
+                double offset_x = 0.0, offset_y = 0.0, offset_r = 0.0;
+                double time_ms = 0.0;
+                float similarity = 0.0f;
+
+                //bool success = RunMarkMatchingSingle(
+                //    filePath.toStdString().c_str(),
+                //    outputPath.toStdString().c_str(),
+                //    &offset_x, &offset_y, &offset_r,
+                //    &similarity, &time_ms,
+                //    &threshold,
+                //    &roi  // 传入自定义MarkRect的地址（关键修改）
+                //);
+                // 
+                /*NccRect roi0;
+                roi0.x = roi.x;
+                roi0.y = roi.y;
+                roi0.width = roi.width;
+                roi0.height = roi.height;
+                NccMatchResult result1;
+                const char* xmlPath = "edge_points.xml";
+                bool success = NCC_PerformMatching(filePath.toStdString().c_str(), xmlPath, &roi0, &result1);
+                offset_x = result1.x;
+                offset_y = result1.y;*/
+                // 
+                ///////////
+                NccRect roi0;
+                roi0.x = roi.x;
+                roi0.y = roi.y;
+                roi0.width = roi.width;
+                roi0.height = roi.height;
+                NccMatchResult result0;
+                const char* xmlPath = "edge_points.xml";
+                if (algorithm == "icp")
+                {
+                    success = NCC_PerformMatching(filePath.toStdString().c_str(), xmlPath, &roi0, &result0);
+                }
+                else
+                {
+                    QString markTypeStr = ui->comboBox_symmetry->currentText();
+                    int markType = convertMarkTypeToInt(markTypeStr); // 需要实现这个转换函数
+                    success = Region_PerformMatching(filePath.toStdString().c_str(), outputPath.toStdString().c_str(), &roi0, &result0, markType);
+                }
+
+                offset_x = result0.x;
+                offset_y = result0.y;
+                offset_r = result0.angle;
+                if (success) {
+                    std::string utf8FilePath = filePath.toUtf8().toStdString();
+                    resultOut << utf8FilePath << ",测试成功,"
+                        << offset_x << "," << offset_y << "," << offset_r << ","
+                        << time_ms << "," << similarity << ",0\n";
+                    appendLog(codec->toUnicode("成功 - %1 | X: %2 Y: %3 R: %4° 分数: %5 耗时: %6 ms")
+                        .arg(filePath)
+                        .arg(offset_x, 0, 'f', 3)
+                        .arg(offset_y, 0, 'f', 3)
+                        .arg(offset_r, 0, 'f', 3)
+                        .arg(similarity, 0, 'f', 3)
+                        .arg(time_ms, 0, 'f', 3));
+
+                    // 特征点绘制（路径优化为相对路径）
+                    //QVector<QPointF> features;
+                    //QString featureFilePath = "template_features.txt";  // 与算法输出路径一致
+                    //QFile featureFile(featureFilePath);
+                    //if (!featureFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+                    //    appendLog("无法打开特征点文件: " + featureFilePath);
+                    //}
+                    //else {
+                    //    QTextStream in(&featureFile);
+                    //    while (!in.atEnd()) {
+                    //        double x = 0, y = 0;
+                    //        in >> x >> y;
+                    //        if (in.status() == QTextStream::Ok) {
+                    //            features.append(QPointF(x, y));
+                    //        }
+                    //        else {
+                    //            break;
+                    //        }
+                    //    }
+                    //    featureFile.close();
+                    //}
+
+                    // 更新第二视图
+                    offset_r += threshold - 6;
+                    scene2->clear();
+                    QImage originalImage(filePath);
+                    if (!originalImage.isNull()) {
+                        QGraphicsPixmapItem* item = new QGraphicsPixmapItem(QPixmap::fromImage(originalImage));
+                        scene2->addItem(item);
+                        ui->graphicsView_2->setScene(scene2);
+                        ui->graphicsView_2->fitInView(item, Qt::KeepAspectRatio);
+                    }
+                    //drawFeatureTrajectory(features, offset_x, offset_y, offset_r, Qt::red);
+
+                }
+                else {
+                    resultOut << filePath.toStdString() << ",测试失败,0,0,0,0,0,9999\n";
+                    appendLog(codec->toUnicode("失败 - %1").arg(filePath));
+                }
+
+                QCoreApplication::processEvents();  // 保持界面响应
+            }
+
+            QMessageBox::information(this, codec->toUnicode("完成"),
+                codec->toUnicode("连续测试完成，结果保存在:\n") + resultFile);
         }
 
-        QString resultFile = testFolderPath + "/Test_result.csv";
-        std::ofstream resultOut(resultFile.toStdString());
-        resultOut << "文件路径及文件名,测试结果,offset_X,offset_Y,offset_R,测试时间(ms),测试分数,错误代码\n";
-
-        for (const QString& filePath : testImageFiles) {
-            QImage image(filePath);
-            if (image.isNull()) continue;
-
-            QString tempPath = QCoreApplication::applicationDirPath() + "/temp_input.jpg";
-            if (!image.save(tempPath)) {
-                appendLog(codec->toUnicode("临时图像保存失败: %1").arg(filePath));
-                continue;
+        // ✅ 单张测试
+        else {
+            if (originalPixmap2.isNull()) {
+                QMessageBox::warning(this, codec->toUnicode("提示"), codec->toUnicode("请先加载图像！"));
+                return;
             }
-            QString outputPath = QCoreApplication::applicationDirPath() + "/temp_result.jpg";
 
-            // 读取图像尺寸，计算 ROI（核心修改：使用自定义MarkRect）
-            cv::Mat mat = cv::imread(tempPath.toStdString());
+            // 转换图像为OpenCV格式
+            QImage image = originalPixmap2.toImage().convertToFormat(QImage::Format_RGB888);
+            cv::Mat mat(image.height(), image.width(), CV_8UC3, (void*)image.bits(), image.bytesPerLine());
             if (mat.empty()) {
-                appendLog(codec->toUnicode("无法读取图像: %1").arg(filePath));
-                continue;
+                QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("图像转换失败！"));
+                return;
             }
 
-            MarkRect roi;  // 使用自定义ROI结构体（替代cv::Rect）
-            bool useSelectedRoi = false;
+            QString tempInputPath = QCoreApplication::applicationDirPath() + "/temp_input.png";
+            cv::imwrite(tempInputPath.toStdString(), mat);
+            QString outputPath = QCoreApplication::applicationDirPath() + "/match_result.jpg";
 
-            if (hasSelectedRoi2 && !selectedRoi2.isEmpty()) {
-                // 1. 使用第二个视图的选中区域作为 ROI
-                int x = static_cast<int>(qRound(selectedRoi2.x()));  // 确保整数坐标
-                int y = static_cast<int>(qRound(selectedRoi2.y()));
-                int width = static_cast<int>(qRound(selectedRoi2.width()));
-                int height = static_cast<int>(qRound(selectedRoi2.height()));
+            // 计算ROI偏移量
+            MarkRect roi = calculateROI(mat, hasSelectedRoi2, selectedRoi2);
+            // 2. 执行匹配
 
-                // 严格边界检查（防止超出图像范围）
-                x = qMax(0, x);
-                y = qMax(0, y);
-                width = qMin(mat.cols - x, width);  // 宽度不超出右边界
-                height = qMin(mat.rows - y, height);  // 高度不超出下边界
-                width = qMax(10, width);  // 最小宽度限制（避免无效ROI）
-                height = qMax(10, height);  // 最小高度限制
-
-                // 赋值给自定义ROI
-                roi.x = x;
-                roi.y = y;
-                roi.width = width;
-                roi.height = height;
-                useSelectedRoi = true;
-                appendLog(QString(codec->toUnicode("对 %1 使用第二个视图选中ROI: 位置(%2,%3) 大小(%4×%5)"))
-                    .arg(filePath).arg(x).arg(y).arg(width).arg(height));
+            /// NCC模板匹配过程，使用时取消注释
+            NccRect roi1;
+            roi1.x = roi.x;
+            roi1.y = roi.y;
+            roi1.width = roi.width;
+            roi1.height = roi.height;
+            NccMatchResult result1;
+            const char* xmlPath = "edge_points.xml";
+            if (algorithm == "icp")
+            {
+                success = NCC_PerformMatching(filePath.toStdString().c_str(), xmlPath, &roi1, &result1);
             }
-            else {
-                // 2. 无选中区域，使用默认正方形ROI计算
-                int centerX = mat.cols / 2;
-                int centerY = mat.rows / 2;
-                int halfWidth = max((mat.cols - offset) / 2, 0);
-                int halfHeight = max((mat.rows - offset) / 2, 0);
-                int halfSize = min(halfWidth, halfHeight);
-                halfSize = max(halfSize, 50);  // 最小半边长限制
-
-                int x = max(centerX - halfSize, 0);
-                int y = max(centerY - halfSize, 0);
-                int size = min(2 * halfSize, min(mat.cols - x, mat.rows - y));  // 最终边长
-
-                // 赋值给自定义ROI
-                roi.x = x;
-                roi.y = y;
-                roi.width = size;
-                roi.height = size;
-                appendLog(QString(codec->toUnicode("对 %1 使用默认ROI: 位置(%2,%3) 大小(%4×%5)"))
-                    .arg(filePath).arg(x).arg(y).arg(size).arg(size));
+            else
+            {
+                QString markTypeStr = ui->comboBox_symmetry->currentText();
+                int markType = convertMarkTypeToInt(markTypeStr); // 需要实现这个转换函数
+                success = Region_PerformMatching(filePath.toStdString().c_str(), outputPath.toStdString().c_str(), &roi1, &result1, markType);
             }
+            //bool success = NCC_PerformMatching(filePath.toStdString().c_str(), xmlPath,&roi1, &result1);
 
-            // 运行匹配（传入自定义ROI）
+             //////////////////////////////////////////
+             //bool success = Region_PerformMatching(filePath.toStdString().c_str(), xmlPath, &roi1, &result1);
+             //
+             // 运行匹配（传入自定义ROI）
             double offset_x = 0.0, offset_y = 0.0, offset_r = 0.0;
             double time_ms = 0.0;
             float similarity = 0.0f;
-
+            offset_x = result1.x;
+            offset_y = result1.y;
+            offset_r = result1.angle;
+            similarity = result1.similarity;
+            time_ms = result1.time_ms;
+            ////第二种方法
             //bool success = RunMarkMatchingSingle(
-            //    tempPath.toStdString().c_str(),
+            //    tempInputPath.toStdString().c_str(),
             //    outputPath.toStdString().c_str(),
             //    &offset_x, &offset_y, &offset_r,
             //    &similarity, &time_ms,
             //    &threshold,
             //    &roi  // 传入自定义MarkRect的地址（关键修改）
             //);
-            // 
-            ///////////
-            NccRect roi0;
-            roi0.x = roi.x;
-            roi0.y = roi.y;
-            roi0.width = roi.width;
-            roi0.height = roi.height;
-            NccMatchResult result0;
-            const char* xmlPath = "edge_points.xml";
-            bool success = Region_PerformMatching(tempPath.toStdString().c_str(), outputPath.toStdString().c_str(), &roi0, &result0);
-            offset_x = result0.x;
-            offset_y = result0.y;
+
             if (success) {
-                offset_r -= threshold - 6;
-                std::string utf8FilePath = filePath.toUtf8().toStdString();
-                resultOut << utf8FilePath << ",测试成功,"
-                    << offset_x << "," << offset_y << "," << offset_r << ","
-                    << time_ms << "," << similarity << ",0\n";
-                appendLog(codec->toUnicode("成功 - %1 | X: %2 Y: %3 R: %4° 分数: %5 耗时: %6 ms")
-                    .arg(filePath)
+                //offset_r -= threshold - 6;
+                // 更新UI显示
+      /*          ui->lineEdit_5->setText(QString::number(offset_x, 'f', 3));
+                ui->lineEdit_6->setText(QString::number(offset_y, 'f', 3));
+                ui->lineEdit_7->setText(QString::number(offset_r, 'f', 3));
+                ui->lineEdit_8->setText(QString::number(time_ms, 'f', 3));
+                ui->lineEdit_9->setText(QString::number(similarity, 'f', 3))*/;
+                /*  QMessageBox::information(this, codec->toUnicode("匹配成功"),
+                      codec->toUnicode("匹配结果已保存并显示。"));*/
+                loadImageToSecondView(tempInputPath);
+                appendLog(codec->toUnicode("匹配成功 | X: %1 Y: %2 R: %3° 分数: %4 耗时: %5 ms")
                     .arg(offset_x, 0, 'f', 3)
                     .arg(offset_y, 0, 'f', 3)
                     .arg(offset_r, 0, 'f', 3)
                     .arg(similarity, 0, 'f', 3)
                     .arg(time_ms, 0, 'f', 3));
 
-                // 特征点绘制（路径优化为相对路径）
-                QVector<QPointF> features;
-                QString featureFilePath = "template_features.txt";  // 与算法输出路径一致
-                QFile featureFile(featureFilePath);
-                if (!featureFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-                    appendLog("无法打开特征点文件: " + featureFilePath);
+                // 将结果添加到表格中
+                int row = ui->tableWidget_results->rowCount();
+                ui->tableWidget_results->insertRow(row);
+                ui->tableWidget_results->setItem(row, 0, new QTableWidgetItem(codec->toUnicode("匹配结果")));
+                ui->tableWidget_results->setItem(row, 1, new QTableWidgetItem(QString::number(offset_x, 'f', 3)));
+                ui->tableWidget_results->setItem(row, 2, new QTableWidgetItem(QString::number(offset_y, 'f', 3)));
+                ui->tableWidget_results->setItem(row, 3, new QTableWidgetItem(QString::number(offset_r, 'f', 3)));
+                ui->tableWidget_results->setItem(row, 4, new QTableWidgetItem(QString::number(similarity * 100.0, 'f', 2)));
+                ui->tableWidget_results->setItem(row, 5, new QTableWidgetItem(QString::number(time_ms, 'f', 3)));
+
+                // 绘制特征点（使用相对路径）
+                /*QVector<QPointF> features;
+                QString filePath = "template_features.txt";
+                QFile file(filePath);
+                if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+                    appendLog("无法打开特征点文件: " + filePath);
                 }
                 else {
-                    QTextStream in(&featureFile);
+                    QTextStream in(&file);
                     while (!in.atEnd()) {
                         double x = 0, y = 0;
                         in >> x >> y;
@@ -936,192 +1148,130 @@ void MainWindow::on_pushButton_2_clicked()
                             break;
                         }
                     }
-                    featureFile.close();
-                }
+                    file.close();
+                }*/
+                //offset_r -= threshold - 6;
+                //drawFeatureTrajectory(features, offset_x, offset_y, -offset_r, Qt::red);
 
-                // 更新第二视图
-                offset_r += threshold - 6;
-                scene2->clear();
-                QImage originalImage(filePath);
-                if (!originalImage.isNull()) {
-                    QGraphicsPixmapItem* item = new QGraphicsPixmapItem(QPixmap::fromImage(originalImage));
-                    scene2->addItem(item);
-                    ui->graphicsView_2->setScene(scene2);
-                    ui->graphicsView_2->fitInView(item, Qt::KeepAspectRatio);
-                }
-                //drawFeatureTrajectory(features, offset_x, offset_y, offset_r, Qt::red);
+                //drawFeatureTrajectory(offset_x, offset_y, -offset_r, Qt::red);
 
             }
             else {
-                resultOut << filePath.toStdString() << ",测试失败,0,0,0,0,0,9999\n";
-                appendLog(codec->toUnicode("失败 - %1").arg(filePath));
+                /* QMessageBox::warning(this, codec->toUnicode("匹配失败"),
+                     codec->toUnicode("未匹配到结果，请检查图像或模型。"));*/
+                appendLog(codec->toUnicode("匹配失败！"));
             }
-
-            QCoreApplication::processEvents();  // 保持界面响应
-        }
-
-        QMessageBox::information(this, codec->toUnicode("完成"),
-            codec->toUnicode("连续测试完成，结果保存在:\n") + resultFile);
-    }
-
-    // ✅ 单张测试
-    else {
-        if (originalPixmap2.isNull()) {
-            QMessageBox::warning(this, codec->toUnicode("提示"), codec->toUnicode("请先加载图像！"));
-            return;
-        }
-
-        // 转换图像为OpenCV格式
-        QImage image = originalPixmap2.toImage().convertToFormat(QImage::Format_RGB888);
-        cv::Mat mat(image.height(), image.width(), CV_8UC3, (void*)image.bits(), image.bytesPerLine());
-        if (mat.empty()) {
-            QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("图像转换失败！"));
-            return;
-        }
-
-        QString tempInputPath = QCoreApplication::applicationDirPath() + "/temp_input.jpg";
-        cv::imwrite(tempInputPath.toStdString(), mat);
-        QString outputPath = QCoreApplication::applicationDirPath() + "/match_result.jpg";
-
-        // 计算 ROI（核心修改：使用自定义MarkRect）
-        MarkRect roi;  // 自定义ROI结构体
-        if (hasSelectedRoi2 && !selectedRoi2.isEmpty()) {
-            // 1. 使用第二个视图的选中区域作为 ROI
-            int x = static_cast<int>(qRound(selectedRoi2.x()));
-            int y = static_cast<int>(qRound(selectedRoi2.y()));
-            int width = static_cast<int>(qRound(selectedRoi2.width()));
-            int height = static_cast<int>(qRound(selectedRoi2.height()));
-
-            // 边界检查
-            x = qMax(0, x);
-            y = qMax(0, y);
-            width = qMin(mat.cols - x, width);
-            height = qMin(mat.rows - y, height);
-            width = qMax(10, width);
-            height = qMax(10, height);
-
-            roi.x = x;
-            roi.y = y;
-            roi.width = width;
-            roi.height = height;
-            appendLog(QString(codec->toUnicode("单张测试使用选中ROI: 位置(%1,%2) 大小(%3×%4)"))
-                .arg(x).arg(y).arg(width).arg(height));
-        }
-        else {
-            // 2. 无选中区域，使用默认计算
-            int centerX = mat.cols / 2;
-            int centerY = mat.rows / 2;
-            int halfWidth = max((mat.cols - offset) / 2, 0);
-            int halfHeight = max((mat.rows - offset) / 2, 0);
-            int halfSize = min(halfWidth, halfHeight);
-            halfSize = max(halfSize, 50);  // 最小半边长
-
-            int x = max(centerX - halfSize, 0);
-            int y = max(centerY - halfSize, 0);
-            int size = min(2 * halfSize, min(mat.cols - x, mat.rows - y));
-
-            roi.x = x;
-            roi.y = y;
-            roi.width = size;
-            roi.height = size;
-            appendLog(QString(codec->toUnicode("单张测试使用默认ROI: 位置(%1,%2) 大小(%3×%4)"))
-                .arg(x).arg(y).arg(size).arg(size));
-        }
-        // 2. 执行匹配
-
-        /// NCC模板匹配过程，使用时取消注释
-        NccRect roi1;
-        roi1.x = roi.x;
-        roi1.y = roi.y;
-        roi1.width = roi.width;
-        roi1.height = roi.height;
-        NccMatchResult result1;
-        const char* xmlPath = "edge_points.xml";
-        //bool success = NCC_PerformMatching(tempInputPath.toStdString().c_str(), xmlPath,&roi1, &result1);
-        
-        //////////////////////////////////////////
-        bool success = Region_PerformMatching(tempInputPath.toStdString().c_str(), xmlPath, &roi1, &result1);
-        //
-        // 运行匹配（传入自定义ROI）
-        double offset_x = 0.0, offset_y = 0.0, offset_r = 0.0;
-        double time_ms = 0.0;
-        float similarity = 0.0f;
-        offset_x = result1.x;
-        offset_y = result1.y;
-        offset_r = result1.angle;
-        similarity = result1.similarity;
-        time_ms = result1.time_ms;
-        ////第二种方法
-        //bool success = RunMarkMatchingSingle(
-        //    tempInputPath.toStdString().c_str(),
-        //    outputPath.toStdString().c_str(),
-        //    &offset_x, &offset_y, &offset_r,
-        //    &similarity, &time_ms,
-        //    &threshold,
-        //    &roi  // 传入自定义MarkRect的地址（关键修改）
-        //);
-
-        if (success) {
-            //offset_r -= threshold - 6;
-            // 更新UI显示
-  /*          ui->lineEdit_5->setText(QString::number(offset_x, 'f', 3));
-            ui->lineEdit_6->setText(QString::number(offset_y, 'f', 3));
-            ui->lineEdit_7->setText(QString::number(offset_r, 'f', 3));
-            ui->lineEdit_8->setText(QString::number(time_ms, 'f', 3));
-            ui->lineEdit_9->setText(QString::number(similarity, 'f', 3))*/;
-          /*  QMessageBox::information(this, codec->toUnicode("匹配成功"),
-                codec->toUnicode("匹配结果已保存并显示。"));*/
-            loadImageToSecondView(tempInputPath);
-            appendLog(codec->toUnicode("匹配成功 | X: %1 Y: %2 R: %3° 分数: %4 耗时: %5 ms")
-                .arg(offset_x, 0, 'f', 3)
-                .arg(offset_y, 0, 'f', 3)
-                .arg(offset_r, 0, 'f', 3)
-                .arg(similarity, 0, 'f', 3)
-                .arg(time_ms, 0, 'f', 3));
-
-            // 将结果添加到表格中
-            int row = ui->tableWidget_results->rowCount();
-            ui->tableWidget_results->insertRow(row);
-            ui->tableWidget_results->setItem(row, 0, new QTableWidgetItem(codec->toUnicode("匹配结果")));
-            ui->tableWidget_results->setItem(row, 1, new QTableWidgetItem(QString::number(offset_x, 'f', 3)));
-            ui->tableWidget_results->setItem(row, 2, new QTableWidgetItem(QString::number(offset_y, 'f', 3)));
-            ui->tableWidget_results->setItem(row, 3, new QTableWidgetItem(QString::number(offset_r, 'f', 3)));
-            ui->tableWidget_results->setItem(row, 4, new QTableWidgetItem(QString::number(similarity * 100.0, 'f', 2)));
-            ui->tableWidget_results->setItem(row, 5, new QTableWidgetItem(QString::number(time_ms, 'f', 3)));
-
-            // 绘制特征点（使用相对路径）
-            /*QVector<QPointF> features;
-            QString filePath = "template_features.txt";
-            QFile file(filePath);
-            if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-                appendLog("无法打开特征点文件: " + filePath);
-            }
-            else {
-                QTextStream in(&file);
-                while (!in.atEnd()) {
-                    double x = 0, y = 0;
-                    in >> x >> y;
-                    if (in.status() == QTextStream::Ok) {
-                        features.append(QPointF(x, y));
-                    }
-                    else {
-                        break;
-                    }
-                }
-                file.close();
-            }*/
-            //offset_r -= threshold - 6;
-            //drawFeatureTrajectory(features, offset_x, offset_y, -offset_r, Qt::red);
-            
-            //drawFeatureTrajectory(offset_x, offset_y, -offset_r, Qt::red);
-
-        }
-        else {
-           /* QMessageBox::warning(this, codec->toUnicode("匹配失败"),
-                codec->toUnicode("未匹配到结果，请检查图像或模型。"));*/
-            appendLog(codec->toUnicode("匹配失败！"));
         }
     }
+    else
+    {
+    //在线测试
+      // 1. 从相机采集一帧图像
+      cv::Mat frame;
+      //APIErrCode err = sm::CVisionInterface::Ins().CameraCapture(frame);
+      //if (err != APIErrCode::SUCCESS) {
+      //    QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("相机采集失败！"));
+      //    return;
+      //}
+
+      //// 2. 停止实时显示和相机流（避免占用资源）
+      //if (m_timer && m_timer->isActive()) {
+      //    m_timer->stop();
+      //    ui->pushButton_7->setText(codec->toUnicode("开始实时显示"));
+      //}
+      //sm::CVisionInterface::Ins().StopCapture();
+      ///////////
+      QImage image = originalPixmap.toImage().convertToFormat(QImage::Format_RGB888);
+      cv::Mat mat(image.height(), image.width(), CV_8UC3, (void*)image.bits(), image.bytesPerLine());
+      frame = mat.clone();
+      ///////////////
+      // 3. 检查图像有效性
+      if (frame.empty()) {
+          QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("采集的图像为空！"));
+          return;
+      }
+
+      // 4. 保存临时图像文件（与单张测试保持一致格式）
+      QString tempInputPath = QCoreApplication::applicationDirPath() + "/temp_input_online.png";
+      if (!cv::imwrite(tempInputPath.toStdString(), frame)) {
+          QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("临时图像保存失败！"));
+          return;
+      }
+      QString outputPath = QCoreApplication::applicationDirPath() + "/match_result_online.jpg";
+
+      // 5. 计算 ROI（基于采集的图像）
+      //    注意：这里需要将 cv::Mat 转为 QImage 或者直接使用 frame 计算 ROI
+      //    假设 calculateROI 支持 cv::Mat，直接传入 frame
+      MarkRect roi = calculateROI(frame, hasSelectedRoi2, selectedRoi2);
+      appendLog(QString(codec->toUnicode("在线测试使用ROI: 位置(%1,%2) 大小(%3×%4)"))
+          .arg(roi.x).arg(roi.y).arg(roi.width).arg(roi.height));
+
+      // 6. 执行匹配（与单张测试完全相同的逻辑）
+      NccRect roi1;
+      roi1.x = roi.x;
+      roi1.y = roi.y;
+      roi1.width = roi.width;
+      roi1.height = roi.height;
+      NccMatchResult result1;
+      const char* xmlPath = "edge_points.xml";
+      bool success = false;
+
+      if (algorithm == "icp") {
+          success = NCC_PerformMatching(tempInputPath.toStdString().c_str(), xmlPath, &roi1, &result1);
+      }
+      else {
+          QString markTypeStr = ui->comboBox_symmetry->currentText();
+          int markType = convertMarkTypeToInt(markTypeStr);
+          success = Region_PerformMatching(tempInputPath.toStdString().c_str(),
+              outputPath.toStdString().c_str(),
+              &roi1, &result1, markType);
+      }
+
+      double offset_x = result1.x;
+      double offset_y = result1.y;
+      double offset_r = result1.angle;
+      float similarity = result1.similarity;
+      double time_ms = result1.time_ms;
+
+      if (success) {
+          // 更新第二个视图显示采集的图像
+          QImage displayImage;
+          if (displayImage.load(tempInputPath)) {
+              scene2->clear();
+              QGraphicsPixmapItem* item = new QGraphicsPixmapItem(QPixmap::fromImage(displayImage));
+              scene2->addItem(item);
+              ui->graphicsView_2->setScene(scene2);
+              ui->graphicsView_2->fitInView(item, Qt::KeepAspectRatio);
+          }
+
+          // 将结果显示在表格中
+          int row = ui->tableWidget_results->rowCount();
+          ui->tableWidget_results->insertRow(row);
+          ui->tableWidget_results->setItem(row, 0, new QTableWidgetItem(codec->toUnicode("在线测试")));
+          ui->tableWidget_results->setItem(row, 1, new QTableWidgetItem(QString::number(offset_x, 'f', 3)));
+          ui->tableWidget_results->setItem(row, 2, new QTableWidgetItem(QString::number(offset_y, 'f', 3)));
+          ui->tableWidget_results->setItem(row, 3, new QTableWidgetItem(QString::number(offset_r, 'f', 3)));
+          ui->tableWidget_results->setItem(row, 4, new QTableWidgetItem(QString::number(similarity * 100.0, 'f', 2)));
+          ui->tableWidget_results->setItem(row, 5, new QTableWidgetItem(QString::number(time_ms, 'f', 3)));
+
+          // 添加日志
+          appendLog(codec->toUnicode("在线测试匹配成功 | X: %1 Y: %2 R: %3° 分数: %4 耗时: %5 ms")
+              .arg(offset_x, 0, 'f', 3)
+              .arg(offset_y, 0, 'f', 3)
+              .arg(offset_r, 0, 'f', 3)
+              .arg(similarity, 0, 'f', 3)
+              .arg(time_ms, 0, 'f', 3));
+
+          // 可选：绘制特征轨迹（如果需要，取消注释）
+          // drawFeatureTrajectory(features, offset_x, offset_y, offset_r, Qt::red);
+      }
+      else {
+          appendLog(codec->toUnicode("在线测试匹配失败！"));
+          QMessageBox::warning(this, codec->toUnicode("匹配失败"),
+              codec->toUnicode("未匹配到结果，请检查图像或模型。"));
+      }
+    }
+    
 }
 
 //选择文件夹
@@ -1858,9 +2008,49 @@ void MainWindow::mousePressEvent(QMouseEvent* event)
     QMainWindow::mousePressEvent(event);
 }
 
+void MainWindow::on_pushButton_detailsDontCare_clicked()
+{
+    QTextCodec* codec = QTextCodec::codecForName("GBK");
+
+    // 检查是否已加载图像
+    if (originalPixmap.isNull()) {
+        QMessageBox::warning(this, codec->toUnicode("提示"),
+            codec->toUnicode("请先加载模板图像！"));
+        return;
+    }
+
+    // 创建对话框
+    DetailsDialog dialog(this);
+
+    // 设置当前图像
+    dialog.setPixmap(originalPixmap);
+
+    // 如果已有忽略区域，传递给对话框
+    if (!detailsIgnoreRegions.isEmpty()) {
+        dialog.setSelectedRegions(detailsIgnoreRegions);
+    }
+
+    // 显示对话框
+    if (dialog.exec() == QDialog::Accepted) {
+        // 用户点击了确定，保存忽略区域
+        detailsIgnoreRegions = dialog.getSelectedRegions();
+
+        appendLog(QString(codec->toUnicode("已设置 %1 个细节忽略区域"))
+            .arg(detailsIgnoreRegions.size()));
+
+        // 可选：在主视图上也显示这些区域
+        //drawIgnoreRegionsOnMainView();
+    }
+    else {
+        // 用户点击了取消
+        appendLog(codec->toUnicode("取消设置细节忽略区域"));
+    }
+}
+
 void MainWindow::on_Camera_test()
 {
     //sm::CameraManager::GetInstance().UseCameraDemo();
+    /*sm::CVisionInterface::Ins().Init();
     cv::Mat img;
     sm::CVisionInterface::Ins().CameraCapture(img);
 
@@ -1880,9 +2070,67 @@ void MainWindow::on_Camera_test()
     scene2->setSceneRect(qpimage.rect());
 
     ui->graphicsView_2->resetTransform();
+    ui->graphicsView_2->fitInView(pixmapItem2, Qt::KeepAspectRatio);*/
+    QTextCodec* codec = QTextCodec::codecForName("GBK");//添加编码格式
+    if (!m_timer) {
+        m_timer = new QTimer(this);
+        connect(m_timer, &QTimer::timeout, this, &MainWindow::updateFrame);
+    }
+
+    //if (!m_timer->isActive()) {
+    //    // 确保相机只初始化一次（移到构造函数或其他地方调用一次即可）
+    //    // sm::CVisionInterface::Ins().Init();   // 建议放到 MainWindow 构造函数中调用一次
+    //    m_timer->start(33);   // 约30帧/秒 (1000/33 ≈ 30)
+    //    ui->pushButton_7->setText(codec->toUnicode("停止实时显示"));
+    //}
+    //else {
+    //    m_timer->stop();
+    //    ui->pushButton_7->setText(codec->toUnicode("开始实时显示"));
+    //}
+    if (m_timer->isActive()) {
+        // 停止实时显示
+        m_timer->stop();
+        ui->pushButton_7->setText(codec->toUnicode("开始实时显示"));
+        // 注意：停止定时器后，相机仍然处于抓图状态，但不再采集帧。
+        // 如果希望停止相机抓图以释放资源，可以调用 StopCapture()，但这样下次启动时需要重新 StartCapture。
+        // 为了下次能快速启动，建议不停止相机抓图，仅停止定时器。
+        // 如果之前在线测试时调用了 StopCapture()，那么下次启动前必须调用 StartCapture。
+    }
+    else {
+        // 开始实时显示
+        // 确保相机处于抓图状态（如果之前被 StopCapture 停止了，需要重新启动）
+        sm::CVisionInterface::Ins().StartCapture();   // 关键：确保相机开始抓图
+
+        m_timer->start(33);
+        ui->pushButton_7->setText(codec->toUnicode("停止实时显示"));
+    }
+}
+void MainWindow::updateFrame()
+{
+    cv::Mat img;
+    if (sm::CVisionInterface::Ins().CameraCapture(img) != APIErrCode::SUCCESS) {
+        // 采集失败可做简单处理，比如返回
+        return;
+    }
+
+    QPixmap qpimage = QPixmap::fromImage(cvMat2QImage(img));
+
+    if (!scene2) {
+        scene2 = new QGraphicsScene(this);
+        ui->graphicsView_2->setScene(scene2);
+        ui->graphicsView_2->setDragMode(QGraphicsView::ScrollHandDrag);
+        ui->graphicsView_2->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
+    }
+    else {
+        scene2->clear();
+    }
+
+    pixmapItem2 = scene2->addPixmap(qpimage);
+    scene2->setSceneRect(qpimage.rect());
+
+    ui->graphicsView_2->resetTransform();
     ui->graphicsView_2->fitInView(pixmapItem2, Qt::KeepAspectRatio);
 }
-
 //相机初始化
 void MainWindow::on_OpenCamera_test()
 {
@@ -1891,7 +2139,7 @@ void MainWindow::on_OpenCamera_test()
 
 void MainWindow::on_CloseCamera_test()
 {
-    //sm::CVisionInterface::Ins().();
+    sm::CVisionInterface::Ins().CloseCamera();
 }
 
 void MainWindow::SearchAndConnectCamera()

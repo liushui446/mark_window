@@ -29,7 +29,7 @@ protected:
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
     void contextMenuEvent(QContextMenuEvent* event) override; // 右键菜单事件
-
+    bool eventFilter(QObject* watched, QEvent* event) override;
 private slots:
     // 菜单动作槽函数
     void onSaveRegionAction();        // 保存区域

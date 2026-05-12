@@ -8,7 +8,8 @@
 #include "ImageWindow.h"
 #include <QStringListModel>
 #include <QStringList>
-
+#include "detailsdialog.h"
+#include <QTimer> 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
@@ -57,15 +58,16 @@ private slots:
     void on_Camera_test();
     void on_OpenCamera_test();//打开相机
     void on_CloseCamera_test();//关闭相机
+    void updateFrame();   // 定时采集并刷新画面
 
-
+    void on_pushButton_detailsDontCare_clicked();  // 细节忽略区域按钮
 private:
     Ui::MainWindow* ui;
     QGraphicsScene* scene = nullptr;
     QGraphicsPixmapItem* pixmapItem = nullptr;
     double scaleFactor1 = 1.0;  // 用于 graphicsView
     double scaleFactor2 = 1.0;  // 用于 graphicsView_2
-
+    bool onlinetest = 0;//在线测试
     ImageWindow* imageWindow = nullptr;  // 子窗口指针
 
     QGraphicsScene* scene2 = nullptr;
@@ -73,7 +75,8 @@ private:
     QPixmap originalPixmap2;
     QPixmap binaryPixmap2;
     bool showingBinary2 = false;
-
+    QString filePath;
+    QString filePath_orgin;
     QString testFolderPath;                       // 连续测试文件夹路径
     QStringList testImageFiles;                   // 存储图像文件路径列表
 
@@ -108,6 +111,10 @@ private:
     bool m_userScaled;  // 记录用户是否手动缩放过视图
     QTransform m_lastTransform;  // 保存最后一次用户变换
 
+    QVector<QRectF> detailsIgnoreRegions;  // 存储细节忽略区域
+    int convertMarkTypeToInt(const QString& markTypeStr);//标记类型
+
+    QTimer* m_timer= nullptr;
 protected:
     void wheelEvent(QWheelEvent* event) override; // 确保声明了 wheelEvent
     void mousePressEvent(QMouseEvent* event) override;

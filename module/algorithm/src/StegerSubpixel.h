@@ -121,7 +121,9 @@ vector<Point> extractEdgePoints(const Mat& grayImage, double threshold1, double 
 
 // 核心函数：结合Facet模型和Hessian矩阵提取亚像素边缘点
 vector<Point2f> facetHessianSubpixel(const Mat& image, const vector<Point>& edgePoints);
-
+int SubPixelByZernike1(const cv::Mat& src,
+	const std::vector<cv::Point>& vecFinalKeypoints,
+	std::vector<cv::Point2f>& group_pin_tough_corners);
 int SubPixelByZernike(cv::Mat src, std::vector<cv::Point> vecFinalKeypoints, std::vector<cv::Point2f>& group_pin_tough_corners);
 int CalulateCon(cv::Mat src, cv::Mat kernal, double& value);
 int SubPixelBySM(cv::Mat src, std::vector<cv::Point> vecFinalKeypoints, std::vector<cv::Point2f>& group_pin_tough_corners);

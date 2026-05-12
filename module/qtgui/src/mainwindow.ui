@@ -197,6 +197,11 @@ QHeaderView::section {
                <string>icp</string>
               </property>
              </item>
+             <item>
+              <property name="text">
+               <string>梯度法</string>
+              </property>
+             </item>
             </widget>
            </item>
            <item row="3" column="0">
@@ -236,14 +241,14 @@ QHeaderView::section {
            <item row="0" column="0">
             <widget class="QLabel" name="label_2">
              <property name="text">
-              <string>训练算法:</string>
+              <string>算法选择:</string>
              </property>
             </widget>
            </item>
            <item row="1" column="0">
             <widget class="QLabel" name="label_3">
              <property name="text">
-              <string>对称搜索:</string>
+              <string>标记类型:</string>
              </property>
             </widget>
            </item>
@@ -251,7 +256,27 @@ QHeaderView::section {
             <widget class="QComboBox" name="comboBox_symmetry">
              <item>
               <property name="text">
-               <string>不搜索</string>
+               <string>Cross Mark</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>Bar-in-Bar</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>Box-in-Box </string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>Frame-in-Frame</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>AIM</string>
               </property>
              </item>
             </widget>
@@ -683,47 +708,15 @@ QGroupBox::title { color: black; }</string>
          <layout class="QHBoxLayout" name="toolbarLayout">
           <item>
            <widget class="QPushButton" name="pushButton_tool1">
-            <property name="minimumSize">
-             <size>
-              <width>80</width>
-              <height>30</height>
-             </size>
-            </property>
-            <property name="maximumSize">
-             <size>
-              <width>80</width>
-              <height>30</height>
-             </size>
-            </property>
             <property name="text">
              <string>打开相机</string>
-            </property>
-            <property name="icon">
-             <iconset theme="go-up">
-              <normaloff>.</normaloff>.</iconset>
             </property>
            </widget>
           </item>
           <item>
            <widget class="QPushButton" name="pushButton_tool2">
-            <property name="minimumSize">
-             <size>
-              <width>80</width>
-              <height>30</height>
-             </size>
-            </property>
-            <property name="maximumSize">
-             <size>
-              <width>80</width>
-              <height>30</height>
-             </size>
-            </property>
             <property name="text">
              <string>关闭相机</string>
-            </property>
-            <property name="icon">
-             <iconset theme="edit-undo">
-              <normaloff>.</normaloff>.</iconset>
             </property>
            </widget>
           </item>
@@ -807,7 +800,7 @@ QGroupBox::title { color: black; }</string>
              </size>
             </property>
             <property name="text">
-             <string>模板匹配</string>
+             <string>检测</string>
             </property>
            </widget>
           </item>
@@ -1183,7 +1176,7 @@ QGroupBox::title { color: black; }</string>
      <x>0</x>
      <y>0</y>
      <width>1316</width>
-     <height>26</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menu">

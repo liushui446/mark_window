@@ -62,26 +62,8 @@ extern "C" {
         const char* testImagePath,
         const char* edgeXmlPath,
         const NccRect* roi,
-        NccMatchResult* result
-    );
-    /**
-     * @brief 设置Canny边缘检测参数
-     * @param thresh1 低阈值
-     * @param thresh2 高阈值
-     * @param apertureSize 孔径大小
-     * @param L2gradient 是否使用L2梯度
-     */
-    //NCC_MATCH_API void NCC_SetCannyParams(
-    //    double thresh1 = 170,
-    //    double thresh2 = 200,
-    //    int apertureSize = 3,
-    //    bool L2gradient = true
-    //);
+        NccMatchResult* result,
+        int markType);
 
-    ///**
-    // * @brief 设置轮廓面积阈值
-    // * @param threshold 面积阈值
-    // */
-    //NCC_MATCH_API void NCC_SetContourAreaThreshold(double threshold = 8.0);
 
 }

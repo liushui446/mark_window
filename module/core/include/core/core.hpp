@@ -26,8 +26,9 @@ namespace sm {
 
     public:
         int timeout;
-        std::vector<Point_f> temp;
+        std::vector<Point_f> sub_features;
         std::vector<Point_f> temp_features;
+        std::vector<Point_f> features;
 
         // 获取单例实例
         static Core* get_init();

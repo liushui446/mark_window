@@ -172,7 +172,32 @@ namespace sm {
             if (heightParam.IsReadable()) {
                 cout << "图像高度：" << heightParam.GetValue() << endl;
             }
+			//抓取图像
+			camera.StartGrabbing(GrabStrategy_LatestImageOnly);
+			CImageFormatConverter formatConverter;
+			formatConverter.OutputPixelFormat = PixelType_BGR8packed;
+			CPylonImage pylonImage;
+			cv::Mat opencvImage;
 
+			const int framesToGrab = 100;  // 抓取 100 帧
+			for (int i = 0; i < framesToGrab && camera.IsGrabbing(); ++i)
+			{
+				CGrabResultPtr grabResult;
+				camera.RetrieveResult(5000, grabResult, TimeoutHandling_ThrowException);
+
+				if (grabResult->GrabSucceeded())
+				{
+					formatConverter.Convert(pylonImage, grabResult);
+					opencvImage = cv::Mat(grabResult->GetHeight(), grabResult->GetWidth(),
+						CV_8UC3, (uint8_t*)pylonImage.GetBuffer());
+				}
+				else
+				{
+					std::cerr << "抓取失败" << std::endl;
+				}
+			}
+
+			camera.StopGrabbing();   // 停止抓图
             // 7. 关闭相机 + 释放传输层
             camera.Close();
             tlFactory.ReleaseTl(pUsbTl); // 必须释放 USB 传输层
@@ -187,5 +212,31 @@ namespace sm {
         PylonTerminate();
         cout << "程序正常退出" << endl;
         return 0;
+	}
+
+	int CameraManager::StopGrabbing(CameraID id)
+	{
+		auto cam = IDtoCamPtr(id);
+		if (cam) {
+			return cam->StopGrabbing();
+		}
+		return -1;
+	}
+
+	int CameraManager::StartGrabbing(CameraID id)
+	{
+		auto cam = IDtoCamPtr(id);
+		if (cam) {
+			return cam->StartGrabbing();
+		}
+		return -1;
+	}
+
+	int CameraManager::CloseDevice(CameraID id) {
+		auto cam = IDtoCamPtr(id);
+		if (cam) {
+			return cam->CloseDevice();
+		}
+		return -1;
 	}
 }

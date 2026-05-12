@@ -34,6 +34,10 @@ namespace sm {
 		APIErrCode CloseCamera();
 		//相机拍照
 		APIErrCode CameraCapture(cv::Mat& img);
+		//停止采集
+		APIErrCode StopCapture();
+		//开始实时采集
+		APIErrCode StartCapture();
 
 	};
 
