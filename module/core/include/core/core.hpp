@@ -19,6 +19,13 @@ struct Point_f {
     double y;
 };
 
+struct IgnoreRect {
+    double x;
+    double y;
+    double width;
+    double height;
+};
+
 namespace sm {
     class SM_EXPORTS Core {
     private:
@@ -29,6 +36,7 @@ namespace sm {
         std::vector<Point_f> sub_features;
         std::vector<Point_f> temp_features;
         std::vector<Point_f> features;
+        std::vector<IgnoreRect> ignore_regions;
 
         // 获取单例实例
         static Core* get_init();

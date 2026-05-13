@@ -1468,6 +1468,10 @@ void NccMatch::extractEdgePointsWithNoiseFilter(
     core->temp_features.clear();
     core->temp_features.reserve(totalKeptPixels);
 
+    // 缓存忽略区域指针，避免循环内反复访问
+    const auto& ignoreRegions = core->ignore_regions;
+    const size_t numIgnore = ignoreRegions.size();
+
     // 单遍扫描，行指针访问
     const int H = edgeImage.rows;
     const int W = edgeImage.cols;
@@ -1476,6 +1480,18 @@ void NccMatch::extractEdgePointsWithNoiseFilter(
         for (int x = 0; x < W; ++x) {
             const int l = rowL[x];
             if (l > 0 && keep[l]) {
+                // 检查是否在忽略区域内
+                bool ignored = false;
+                for (size_t k = 0; k < numIgnore; ++k) {
+                    const auto& ir = ignoreRegions[k];
+                    if (x >= ir.x && x < ir.x + ir.width &&
+                        y >= ir.y && y < ir.y + ir.height) {
+                        ignored = true;
+                        break;
+                    }
+                }
+                if (ignored) continue;
+
                 edgePoints.emplace_back(x, y);
                 Point_f pt;
                 pt.x = static_cast<float>(x);

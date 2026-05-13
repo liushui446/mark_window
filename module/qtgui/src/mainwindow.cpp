@@ -443,7 +443,12 @@ void MainWindow::on_pushButton_8_clicked()
 //}
 void MainWindow::loadImage(const QString& path)
 {
-    QPixmap pixmap(path);
+    QPixmap pixmap;
+    QFile file(path);
+    if (file.open(QIODevice::ReadOnly)) {
+        pixmap.loadFromData(file.readAll());
+        file.close();
+    }
     if (pixmap.isNull()) {
         qDebug() << "图片加载失败：" << path;
         return;
@@ -474,7 +479,12 @@ void MainWindow::loadImage(const QString& path)
 }
 void MainWindow::loadImageToSecondView(const QString& path)
 {
-    QPixmap pixmap(path);
+    QPixmap pixmap;
+    QFile file(path);
+    if (file.open(QIODevice::ReadOnly)) {
+        pixmap.loadFromData(file.readAll());
+        file.close();
+    }
     if (pixmap.isNull()) {
         qDebug() << "图片加载失败：" << path;
         return;
@@ -688,7 +698,7 @@ void MainWindow::on_pushButton_5_clicked()
 
         // 确保临时目录存在并保存临时图像
          tempInputPath = QCoreApplication::applicationDirPath() + "/temp_input.jpg";
-        if (!cv::imwrite(tempInputPath.toStdString(), mat)) {
+        if (!cv::imwrite(tempInputPath.toLocal8Bit().constData(), mat)) {
             QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("临时图像保存失败！"));
             return;
         }
@@ -720,7 +730,24 @@ void MainWindow::on_pushButton_5_clicked()
         roi1.y = roi.y;
         roi1.width = roi.width;
         roi1.height = roi.height;
-        result = NCC_CreateTemplate(filePath_orgin.toStdString().c_str(), xmlPath, &roi1, 1, -5, 5);
+
+        // 将细节忽略区域转换为 ROI 相对坐标并写入 Core
+        sm::Core* core = sm::Core::get_init();
+        core->ignore_regions.clear();
+        for (const auto& rect : detailsIgnoreRegions) {
+            IgnoreRect ir;
+            ir.x = rect.x() - roi.x;
+            ir.y = rect.y() - roi.y;
+            ir.width = rect.width();
+            ir.height = rect.height();
+            // 只保留与 ROI 有交集的区域
+            if (ir.x + ir.width > 0 && ir.y + ir.height > 0 &&
+                ir.x < roi.width && ir.y < roi.height) {
+                core->ignore_regions.push_back(ir);
+            }
+        }
+
+        result = NCC_CreateTemplate(tempInputPath.toLocal8Bit().constData(), xmlPath, &roi1, 1, -5, 5);
     }
     else {
         //在线测试
@@ -751,7 +778,7 @@ void MainWindow::on_pushButton_5_clicked()
 
         // 4. 保存临时图像文件（与离线模式保持一致）
         tempInputPath = QCoreApplication::applicationDirPath() + "/temp_input.jpg";
-        if (!cv::imwrite(tempInputPath.toStdString(), frame)) {
+        if (!cv::imwrite(tempInputPath.toLocal8Bit().constData(), frame)) {
             QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("临时图像保存失败！"));
             return;
         }
@@ -780,8 +807,22 @@ void MainWindow::on_pushButton_5_clicked()
         roi1.width = roi.width;
         roi1.height = roi.height;
 
-        // 注意：filePath_orgin 可能仅用于离线模式，在线测试时直接使用临时文件路径
-        result = NCC_CreateTemplate(tempInputPath.toStdString().c_str(), xmlPath, &roi1, 1, -5, 5);
+        // 将细节忽略区域转换为 ROI 相对坐标并写入 Core
+        sm::Core* core = sm::Core::get_init();
+        core->ignore_regions.clear();
+        for (const auto& rect : detailsIgnoreRegions) {
+            IgnoreRect ir;
+            ir.x = rect.x() - roi.x;
+            ir.y = rect.y() - roi.y;
+            ir.width = rect.width();
+            ir.height = rect.height();
+            if (ir.x + ir.width > 0 && ir.y + ir.height > 0 &&
+                ir.x < roi.width && ir.y < roi.height) {
+                core->ignore_regions.push_back(ir);
+            }
+        }
+
+        result = NCC_CreateTemplate(tempInputPath.toLocal8Bit().constData(), xmlPath, &roi1, 1, -5, 5);
     }
     
 
@@ -903,7 +944,12 @@ void MainWindow::on_pushButton_2_clicked()
             int numstest = 0;
 
             for (const QString& filePath : testImageFiles) {
-                QImage image(filePath);
+                QImage image;
+                QFile imgFile(filePath);
+                if (imgFile.open(QIODevice::ReadOnly)) {
+                    image.loadFromData(imgFile.readAll());
+                    imgFile.close();
+                }
                 numstest++;
                 if (numstest > 10)
                 {
@@ -964,13 +1010,13 @@ void MainWindow::on_pushButton_2_clicked()
                 const char* xmlPath = "edge_points.xml";
                 if (algorithm == "icp")
                 {
-                    success = NCC_PerformMatching(filePath.toStdString().c_str(), xmlPath, &roi0, &result0);
+                    success = NCC_PerformMatching(tempPath.toLocal8Bit().constData(), xmlPath, &roi0, &result0);
                 }
                 else
                 {
                     QString markTypeStr = ui->comboBox_symmetry->currentText();
                     int markType = convertMarkTypeToInt(markTypeStr); // 需要实现这个转换函数
-                    success = Region_PerformMatching(filePath.toStdString().c_str(), outputPath.toStdString().c_str(), &roi0, &result0, markType);
+                    success = Region_PerformMatching(tempPath.toLocal8Bit().constData(), outputPath.toLocal8Bit().constData(), &roi0, &result0, markType);
                 }
 
                 offset_x = result0.x;
@@ -1052,7 +1098,7 @@ void MainWindow::on_pushButton_2_clicked()
             }
 
             QString tempInputPath = QCoreApplication::applicationDirPath() + "/temp_input.png";
-            cv::imwrite(tempInputPath.toStdString(), mat);
+            cv::imwrite(tempInputPath.toLocal8Bit().constData(), mat);
             QString outputPath = QCoreApplication::applicationDirPath() + "/match_result.jpg";
 
             // 计算ROI偏移量
@@ -1069,13 +1115,13 @@ void MainWindow::on_pushButton_2_clicked()
             const char* xmlPath = "edge_points.xml";
             if (algorithm == "icp")
             {
-                success = NCC_PerformMatching(filePath.toStdString().c_str(), xmlPath, &roi1, &result1);
+                success = NCC_PerformMatching(tempInputPath.toLocal8Bit().constData(), xmlPath, &roi1, &result1);
             }
             else
             {
                 QString markTypeStr = ui->comboBox_symmetry->currentText();
                 int markType = convertMarkTypeToInt(markTypeStr); // 需要实现这个转换函数
-                success = Region_PerformMatching(filePath.toStdString().c_str(), outputPath.toStdString().c_str(), &roi1, &result1, markType);
+                success = Region_PerformMatching(tempInputPath.toLocal8Bit().constData(), outputPath.toLocal8Bit().constData(), &roi1, &result1, markType);
             }
             //bool success = NCC_PerformMatching(filePath.toStdString().c_str(), xmlPath,&roi1, &result1);
 
@@ -1193,7 +1239,7 @@ void MainWindow::on_pushButton_2_clicked()
 
       // 4. 保存临时图像文件（与单张测试保持一致格式）
       QString tempInputPath = QCoreApplication::applicationDirPath() + "/temp_input_online.png";
-      if (!cv::imwrite(tempInputPath.toStdString(), frame)) {
+      if (!cv::imwrite(tempInputPath.toLocal8Bit().constData(), frame)) {
           QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("临时图像保存失败！"));
           return;
       }
@@ -1217,13 +1263,13 @@ void MainWindow::on_pushButton_2_clicked()
       bool success = false;
 
       if (algorithm == "icp") {
-          success = NCC_PerformMatching(tempInputPath.toStdString().c_str(), xmlPath, &roi1, &result1);
+          success = NCC_PerformMatching(tempInputPath.toLocal8Bit().constData(), xmlPath, &roi1, &result1);
       }
       else {
           QString markTypeStr = ui->comboBox_symmetry->currentText();
           int markType = convertMarkTypeToInt(markTypeStr);
-          success = Region_PerformMatching(tempInputPath.toStdString().c_str(),
-              outputPath.toStdString().c_str(),
+          success = Region_PerformMatching(tempInputPath.toLocal8Bit().constData(),
+              outputPath.toLocal8Bit().constData(),
               &roi1, &result1, markType);
       }
 
@@ -1515,7 +1561,7 @@ void MainWindow::on_pushButton_11_clicked()
     }
 
     QString tempInputPath = QCoreApplication::applicationDirPath() + "/temp_input.jpg";
-    if (!cv::imwrite(tempInputPath.toStdString(), mat)) {
+    if (!cv::imwrite(tempInputPath.toLocal8Bit().constData(), mat)) {
         QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("临时图像保存失败！"));
         return;
     }
@@ -1595,8 +1641,8 @@ void MainWindow::on_pushButton_11_clicked()
 
         // 调用匹配接口（传入自定义ROI结构体）
         bool success = RunMarkMatchingSingle(
-            tempInputPath.toStdString().c_str(),
-            outputPath.toStdString().c_str(),
+            tempInputPath.toLocal8Bit().constData(),
+            outputPath.toLocal8Bit().constData(),
             &offset_x, &offset_y, &offset_r,
             &similarity, &time_ms,
             &threshold,
