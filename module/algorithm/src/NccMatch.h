@@ -20,6 +20,7 @@ private:
 
 
     bool   templatesBuilt_ = false;   // 边缘模板是否已建
+    bool   smallTemplate_ = false;
     cv::Size lastRefSize_;             // 上次准备的参考图尺寸
     // 把 generateTemplates1 拆开后内部用：
     std::vector<cv::Mat>   alignedTemplates_;     // 各角度对齐后的空间模板

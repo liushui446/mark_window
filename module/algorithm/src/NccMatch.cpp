@@ -1,4 +1,5 @@
 ﻿#include "NccMatch.h"
+#include <limits>
 #include <opencv2/opencv.hpp>
 #include <iostream>
 #include <fstream>
@@ -43,11 +44,11 @@ bool NccMatch::extractEdgePoints(const cv::Mat& grayImage, std::vector<cv::Point
     const double imgStd = stddev[0];
     const bool lowContrast = (imgStd < 15.0);
 
-    // ---- 保边降噪（关键：替代原 GaussianBlur，避免噪声被 Canny 当成边）----
-    // sigmaColor ≈ 3×std：能抹平背景噪声、保留真实边
+    // ---- 保边降噪（bilateralFilter 保留真实边缘，对模板质量至关重要）----
     const double sigmaColor = std::max(15.0, 3.0 * imgStd);
     cv::Mat denoised;
-    cv::bilateralFilter(grayImage, denoised, /*d=*/7, sigmaColor, /*sigmaSpace=*/7);
+    cv::GaussianBlur(grayImage, denoised, cv::Size(3, 3), 1.0);
+    //cv::bilateralFilter(grayImage, denoised, 7, sigmaColor, 7);
 
     // ---- 自适应 Canny 阈值 ----
     double lowT, highT;
@@ -65,8 +66,8 @@ bool NccMatch::extractEdgePoints(const cv::Mat& grayImage, std::vector<cv::Point
     cv::Canny(denoised, edges, lowT, highT, 3, /*L2gradient=*/true);
 
     // 闭运算连接细微断裂
-    static const cv::Mat k3 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
-    cv::morphologyEx(edges, edges, cv::MORPH_CLOSE, k3);
+    //static const cv::Mat k3 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
+    //cv::morphologyEx(edges, edges, cv::MORPH_CLOSE, k3);
 
     lastEdgeImage_ = edges;  // 不需要 clone，下面就不再写 edges
 
@@ -77,7 +78,7 @@ bool NccMatch::extractEdgePoints(const cv::Mat& grayImage, std::vector<cv::Point
     // ---- 兜底：完全没提到点就放宽阈值再试一次 ----
     if (edgePoints.empty()) {
         cv::Canny(denoised, edges, 10, 30, 3, true);
-        cv::morphologyEx(edges, edges, cv::MORPH_CLOSE, k3);
+        //cv::morphologyEx(edges, edges, cv::MORPH_CLOSE, k3);
         lastEdgeImage_ = edges;
         extractEdgePointsWithNoiseFilter(edges, edgePoints, 15);
     }
@@ -464,6 +465,9 @@ bool NccMatch::buildAngleTemplates(const std::vector<cv::Point2f>& edgePoints,
     baseH_ = baseBbox_.height;
     if (baseW_ < 20 || baseH_ < 20) return false;
 
+    // 小模板标记：宽或高 < 500 时粗匹配不做下采样
+    smallTemplate_ = (baseW_ < 500 || baseH_ < 500);
+
     const float cx = baseW_ * 0.5f;
     const float cy = baseH_ * 0.5f;
     origTempCenter_ = { cx, cy };
@@ -583,7 +587,8 @@ bool NccMatch::buildAngleTemplates(const std::vector<cv::Point2f>& edgePoints,
 
         template_pyrdown_[i] = { { origRotated, scaled2Rotated }, angleRad };
         rotatedSubedgePoints_[i] = { std::move(rotatedSubPts), angle };
-        tempSpatialTemps[i] = scaled2Rotated;
+        // 小模板用 0 层（原始尺寸）做粗匹配，大模板用 2 层（下采样）
+        tempSpatialTemps[i] = smallTemplate_ ? origRotated : scaled2Rotated;
     }
 
     // 对齐到最大尺寸
@@ -621,21 +626,36 @@ bool NccMatch::prepareForImage(const cv::Mat& refImage) {
 
     fourierTemplates_.clear();
 
-    // 4 倍下采样
-    cv::pyrDown(refImage, downsampledRefImage_,
-        cv::Size(refImage.cols / 2, refImage.rows / 2));
-    cv::pyrDown(downsampledRefImage_, downsampledRefImage_,
-        cv::Size(downsampledRefImage_.cols / 2,
-            downsampledRefImage_.rows / 2));
+    if (smallTemplate_) {
+        // 小模板：不下采样，直接用原始分辨率
+        downsampledRefImage_ = refImage;  // 保存引用，matchAngleTemplate 会复用
+        corrSize_ = { refImage.cols - maxTemplateSize_.width + 1,
+                      refImage.rows - maxTemplateSize_.height + 1 };
 
-    corrSize_ = { downsampledRefImage_.cols - maxTemplateSize_.width + 1,
-                  downsampledRefImage_.rows - maxTemplateSize_.height + 1 };
+        fourierTemplates_.reserve(alignedTemplates_.size());
+        for (auto& t : alignedTemplates_) {
+            cv::Mat dftT;
+            dftTemp(refImage, t, dftT, CV_32F);
+            if (!dftT.empty()) fourierTemplates_.push_back(std::move(dftT));
+        }
+    }
+    else {
+        // 大模板：4 倍下采样
+        cv::pyrDown(refImage, downsampledRefImage_,
+            cv::Size(refImage.cols / 2, refImage.rows / 2));
+        cv::pyrDown(downsampledRefImage_, downsampledRefImage_,
+            cv::Size(downsampledRefImage_.cols / 2,
+                downsampledRefImage_.rows / 2));
 
-    fourierTemplates_.reserve(alignedTemplates_.size());
-    for (auto& t : alignedTemplates_) {
-        cv::Mat dftT;
-        dftTemp(downsampledRefImage_, t, dftT, CV_32F);
-        if (!dftT.empty()) fourierTemplates_.push_back(std::move(dftT));
+        corrSize_ = { downsampledRefImage_.cols - maxTemplateSize_.width + 1,
+                      downsampledRefImage_.rows - maxTemplateSize_.height + 1 };
+
+        fourierTemplates_.reserve(alignedTemplates_.size());
+        for (auto& t : alignedTemplates_) {
+            cv::Mat dftT;
+            dftTemp(downsampledRefImage_, t, dftT, CV_32F);
+            if (!dftT.empty()) fourierTemplates_.push_back(std::move(dftT));
+        }
     }
     lastRefSize_ = refImage.size();
     return !fourierTemplates_.empty();
@@ -861,53 +881,71 @@ void NccMatch::crossCorr1(const cv::Mat& img, const cv::Mat& _dftTempl, cv::Mat&
 }
 bool NccMatch::bestTemplate(const std::vector<cv::Mat>& image, const int& method, int& result)
 {
-    double minVal; double maxVal; cv::Point minLoc; cv::Point maxLoc;
-    std::vector<std::pair<double, int>> Val;
+    double minVal, maxVal;
+    cv::Point minLoc, maxLoc;
+    double bestVal = std::numeric_limits<double>::max();
+    result = 0;
     for (unsigned int i = 0; i < image.size(); i++)
     {
-        cv::minMaxLoc(image.at(i), &minVal, &maxVal, &minLoc, &maxLoc, cv::Mat());
-        Val.push_back(std::pair<double, int>(minVal, i));
-    }
-    std::sort(Val.begin(), Val.end());
-    for (int i = 0; i < Val.size(); i++)
-    {
-        if (Val[i].first != 0)
-        {
-            result = Val[i].second;
-            break;
+        if (image[i].empty()) continue;
+        cv::minMaxLoc(image[i], &minVal, &maxVal, &minLoc, &maxLoc, cv::Mat());
+        // 距离变换匹配：模板边缘对齐图像边缘时互相关值最低，选 minVal 最小的角度
+        if (minVal < bestVal) {
+            bestVal = minVal;
+            result = i;
         }
     }
     return true;
 }
 bool NccMatch::matchAngleTemplate(const cv::Mat& grayImage, std::vector<cv::Mat>& results) {
-    if (fourierTemplates_.empty()) return false;
+    if (template_pyrdown_.empty()) return false;
 
-    // 直接复用 prepareForImage 里已经算好的 downsampledRefImage_
-    // 如果尺寸不一致就当场补一次
-    cv::Mat small_image;
+    cv::Mat match_edge;
+    robustCanny(grayImage, match_edge);
+
+    cv::Mat edge_inv;
+    cv::bitwise_not(match_edge, edge_inv);
+    cv::Mat dist = cv::Mat::zeros(grayImage.size(), CV_32FC1);
+    cv::distanceTransform(edge_inv, dist, cv::DIST_L2, cv::DIST_MASK_PRECISE);
+
+    if (smallTemplate_) {
+        // 小模板：用 cv::matchTemplate + TM_CCOEFF_NORMED，归一化不受模板大小影响
+        cv::exp(-0.2 * dist, dist);
+        cv::Mat distScore = 1.0f - dist;
+
+        results.resize(template_pyrdown_.size());
+        for (size_t i = 0; i < template_pyrdown_.size(); ++i) {
+            cv::Mat templFloat;
+            template_pyrdown_[i].first[0].convertTo(templFloat, CV_32F, 1.0 / 255.0);
+            cv::matchTemplate(distScore, templFloat, results[i], cv::TM_CCOEFF_NORMED);
+        }
+        return true;
+    }
+
+    // 大模板：原有 FFT 流程
+    if (fourierTemplates_.empty()) return false;
+    cv::Mat matchImage;
     if (!downsampledRefImage_.empty() &&
         downsampledRefImage_.cols == grayImage.cols / 4 &&
         downsampledRefImage_.rows == grayImage.rows / 4) {
-        small_image = downsampledRefImage_;     // 浅拷贝
+        matchImage = downsampledRefImage_;
     }
     else {
-        cv::pyrDown(grayImage, small_image,
+        cv::pyrDown(grayImage, matchImage,
             cv::Size(grayImage.cols / 2, grayImage.rows / 2));
-        cv::pyrDown(small_image, small_image,
-            cv::Size(small_image.cols / 2, small_image.rows / 2));
+        cv::pyrDown(matchImage, matchImage,
+            cv::Size(matchImage.cols / 2, matchImage.rows / 2));
     }
 
-    cv::Mat small_edge;
-    robustCanny(small_image, small_edge);
+    cv::Mat big_edge;
+    robustCanny(matchImage, big_edge);
+    cv::Mat big_inv;
+    cv::bitwise_not(big_edge, big_inv);
+    cv::Mat bigDist = cv::Mat::zeros(matchImage.size(), CV_32FC1);
+    cv::distanceTransform(big_inv, bigDist, cv::DIST_L2, cv::DIST_MASK_PRECISE);
 
-    cv::Mat edge_inv;
-    cv::bitwise_not(small_edge, edge_inv);
-    cv::Mat dist = cv::Mat::zeros(small_image.size(), CV_32FC1);
-    cv::distanceTransform(edge_inv, dist, cv::DIST_L2, cv::DIST_MASK_PRECISE);
-
-    // 11 个角度全要
     results.resize(fourierTemplates_.size());
-    return matchFttTemplate(dist, fourierTemplates_, corrSize_, results, cv::TM_CCORR);
+    return matchFttTemplate(bigDist, fourierTemplates_, corrSize_, results, cv::TM_CCORR);
 }
 bool NccMatch::matchFttTemplate(const cv::Mat& img, std::vector<cv::Mat>& tempdft, cv::Size corrsize, std::vector<cv::Mat>& result, const int& method)
 {
@@ -1029,7 +1067,7 @@ bool NccMatch::runFullMatchingFromPath(const cv::Mat& grayImage,
         int coarseIdx = 0;
         bestTemplate(coarseResults, cv::TM_CCORR, coarseIdx);
 
-        // 4) 全分辨率边缘 + 距离变换（统一走助手）
+        // 4) 全分辨率边缘 + 距离变换
         cv::Mat image_edge;
         robustCanny(testGray, image_edge);
 
@@ -1038,34 +1076,15 @@ bool NccMatch::runFullMatchingFromPath(const cv::Mat& grayImage,
 
         cv::Mat dist;
         cv::distanceTransform(edge_inv, dist, cv::DIST_L2, cv::DIST_MASK_PRECISE);
-        // exp + 1-x 合并成一次 element-wise（也可改成 LUT 进一步加速）
+        // 距离变换评分：1.0 - exp(-0.2 * dist)
         cv::exp(-0.2 * dist, dist);
-        dist = 1.0f - dist;
+        cv::Mat distScore = 1.0f - dist;
 
         // 5) 精匹配（单角度）
-        //small_best_template_index = 5;
-        std::vector<cv::Mat> selected_templ_dft;
-        //double small_thearange[2] = { -1, 1 }; // 匹配角度范围
-        //int index1 = 0;
-        //for (int i = 0; i < 3; i++)
-        //{
-        //    if (small_best_template_index > 0)
-        //    {
-        //        index1 = int(small_best_template_index + i - small_thearange[1]);
-        //    }
-        //    else
-        //    {
-        //        index1 = int(small_best_template_index + i);
-        //    }
-        //    index1 = index1 < 11 ? index1 : 10;
-        //    const auto& tempGroup = template_pyrdown_[index1];
-        //    cv::Mat rotate_template_image = tempGroup.first[0];
-        //    selected_templ_dft.push_back(rotate_template_image);
-        //}
         cv::Mat& rotTempl = template_pyrdown_[coarseIdx].first[0];
         std::vector<cv::Mat> selected{ rotTempl };
         std::vector<cv::Mat> fineResults(1);
-        matchNCCTemplate(dist, selected, fineResults, cv::TM_CCORR_NORMED);
+        matchNCCTemplate(distScore, selected, fineResults, cv::TM_CCORR_NORMED);
 
         // 6) 解析最佳位置
         std::vector<std::pair<double, cv::Point2f>> preciseLoc;
@@ -1076,18 +1095,25 @@ bool NccMatch::runFullMatchingFromPath(const cv::Mat& grayImage,
         bestLoc = preciseLoc[0].second;
         bestScore = preciseLoc[0].first;
 
-        // 7) ICP 亚像素精细化
+        // 7) ICP 亚像素精细化（稀疏采样加速，精度损失极小）
         const auto& rotSubPts = rotatedSubedgePoints_[coarseIdx].first;
         sm::imgproc::Scene_edge scene;
         std::vector<sm::imgproc::Vec2f> pcdBuf, normalBuf;
         scene.init_Scene_edge(testGray, pcdBuf, normalBuf);
 
+        // 均匀稀疏采样：限制最多 800 点，减少 ICP 迭代开销
+        const size_t totalPts = rotSubPts.size();
+        const size_t maxPts = 800;
+        const size_t step = (totalPts > maxPts) ? (totalPts + maxPts - 1) / maxPts : 1;
+
         std::vector<sm::imgproc::Vec2f> modelPcd;
-        modelPcd.reserve(rotSubPts.size());
+        modelPcd.reserve((totalPts + step - 1) / step);
         const float dx = bestLoc.x - rotTempl.cols * 0.5f;
         const float dy = bestLoc.y - rotTempl.rows * 0.5f;
-        for (const auto& p : rotSubPts)
+        for (size_t i = 0; i < totalPts; i += step) {
+            const auto& p = rotSubPts[i];
             modelPcd.push_back({ p.x + dx, p.y + dy });
+        }
 
         auto Re = sm::imgproc::icp::ICP2D_Point2Plane(modelPcd, scene);
         const float xRef = float(Re.transformation_[0][0]) * dx
