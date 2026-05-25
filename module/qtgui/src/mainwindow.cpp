@@ -6,6 +6,7 @@
 #include <QGraphicsView>
 #include <QGraphicsScene>
 #include <QGraphicsPixmapItem>
+#include <QPainterPath>
 #include <QMouseEvent>       // 鼠标事件
 #include <QWheelEvent>       // 滚轮事件（用于 zoom）
 #include <QDebug>            // 输出日志
@@ -128,13 +129,18 @@ MainWindow::MainWindow(QWidget* parent)
 
     //CameraManager::GetInstance().UseBaslerCam();
     // 连接按钮信号槽
-    connect(ui->pushButton_6, &QPushButton::clicked, this, &MainWindow::on_loadFeatureButton_clicked);
-
     connect(ui->pushButton_7, &QPushButton::clicked, this, &MainWindow::on_Camera_test);
 
-    connect(ui->pushButton_tool1, &QPushButton::clicked, this, &MainWindow::on_OpenCamera_test);
+    // 隐藏旧的相机按钮（已移到相机控制区域）
+    ui->pushButton_tool1->hide();
+    ui->pushButton_tool2->hide();
+    ui->pushButton_7->hide();
+    ui->pushButton_6->hide();
 
-    connect(ui->pushButton_tool2, &QPushButton::clicked, this, &MainWindow::on_CloseCamera_test);
+    // 新增相机控制区域按钮连接
+    connect(ui->pushButton_camOpen, &QPushButton::clicked, this, &MainWindow::on_OpenCamera_test);
+    connect(ui->pushButton_camClose, &QPushButton::clicked, this, &MainWindow::on_CloseCamera_test);
+    connect(ui->pushButton_camDetect, &QPushButton::clicked, this, &MainWindow::on_Camera_test);
 
     // 为graphicsView的视口安装事件过滤器
     ui->graphicsView->viewport()->installEventFilter(this);
@@ -160,10 +166,9 @@ MainWindow::MainWindow(QWidget* parent)
     // 创建自定义视图并继承原有属性
     SelectableGraphicsView* newView1 = new SelectableGraphicsView(parentWidget1);
     newView1->setScene(scene);
-    newView1->setRenderHint(QPainter::Antialiasing);
-    newView1->setDragMode(QGraphicsView::ScrollHandDrag);
     newView1->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
     newView1->setMouseTracking(true);
+    newView1->viewport()->setCursor(Qt::ArrowCursor);
     // 关键：继承原有布局属性
     newView1->setSizePolicy(sizePolicy1);
     newView1->setContentsMargins(margins1);
@@ -215,10 +220,9 @@ MainWindow::MainWindow(QWidget* parent)
     // 创建自定义视图并继承原有属性
     SelectableGraphicsView* newView2 = new SelectableGraphicsView(parentWidget2);
     newView2->setScene(scene2);
-    newView2->setRenderHint(QPainter::Antialiasing);
-    newView2->setDragMode(QGraphicsView::ScrollHandDrag);
     newView2->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
     newView2->setMouseTracking(true);
+    newView2->viewport()->setCursor(Qt::ArrowCursor);
     // 关键：继承原有布局属性
     newView2->setSizePolicy(sizePolicy2);
     newView2->setContentsMargins(margins2);
@@ -461,7 +465,7 @@ void MainWindow::loadImage(const QString& path)
     if (!scene) {
         scene = new QGraphicsScene(this);
         ui->graphicsView->setScene(scene);
-        ui->graphicsView->setDragMode(QGraphicsView::ScrollHandDrag);
+        ui->graphicsView->viewport()->setCursor(Qt::ArrowCursor);
         ui->graphicsView->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
     }
     else {
@@ -497,7 +501,7 @@ void MainWindow::loadImageToSecondView(const QString& path)
     if (!scene2) {
         scene2 = new QGraphicsScene(this);
         ui->graphicsView_2->setScene(scene2);
-        ui->graphicsView_2->setDragMode(QGraphicsView::ScrollHandDrag);
+        ui->graphicsView_2->viewport()->setCursor(Qt::ArrowCursor);
         ui->graphicsView_2->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
     }
     else {
@@ -674,6 +678,13 @@ void MainWindow::on_pushButton_clicked()
 void MainWindow::on_pushButton_5_clicked()
 {
     QTextCodec* codec = QTextCodec::codecForName("GBK");  // 编码格式
+
+    // 按钮视觉反馈：禁用按钮并改变文字
+    ui->pushButton_5->setEnabled(false);
+    ui->pushButton_5->setText(codec->toUnicode("正在生成模板..."));
+    ui->pushButton_5->setStyleSheet("background-color: #FFA500; color: white;");  // 橙色背景
+    QCoreApplication::processEvents();  // 立即更新UI
+
     bool result = 0;
     QString tempInputPath;
     MarkRect roi;
@@ -684,6 +695,9 @@ void MainWindow::on_pushButton_5_clicked()
         
         if (!pixmapItem) {
             QMessageBox::warning(this, codec->toUnicode("提示"), codec->toUnicode("请先加载图像！"));
+            ui->pushButton_5->setText(codec->toUnicode("生成模板"));
+            ui->pushButton_5->setStyleSheet("");
+            ui->pushButton_5->setEnabled(true);
             return;
         }
 
@@ -691,8 +705,12 @@ void MainWindow::on_pushButton_5_clicked()
         //QImage image = originalPixmap.toImage().convertToFormat(QImage::Format_RGB888);
         QImage image = originalPixmap.toImage().convertToFormat(QImage::Format_RGB888);
         cv::Mat mat(image.height(), image.width(), CV_8UC3, (void*)image.bits(), image.bytesPerLine());
+        cv::cvtColor(mat, mat, cv::COLOR_RGB2BGR);  // QImage是RGB，OpenCV需要BGR
         if (mat.empty()) {
             QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("图像转换失败！"));
+            ui->pushButton_5->setText(codec->toUnicode("生成模板"));
+            ui->pushButton_5->setStyleSheet("");
+            ui->pushButton_5->setEnabled(true);
             return;
         }
 
@@ -700,6 +718,9 @@ void MainWindow::on_pushButton_5_clicked()
          tempInputPath = QCoreApplication::applicationDirPath() + "/temp_input.jpg";
         if (!cv::imwrite(tempInputPath.toLocal8Bit().constData(), mat)) {
             QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("临时图像保存失败！"));
+            ui->pushButton_5->setText(codec->toUnicode("生成模板"));
+            ui->pushButton_5->setStyleSheet("");
+            ui->pushButton_5->setEnabled(true);
             return;
         }
 
@@ -762,17 +783,21 @@ void MainWindow::on_pushButton_5_clicked()
         //// 2. 停止实时显示和相机抓图
         //if (m_timer && m_timer->isActive()) {
         //    m_timer->stop();
-        //    ui->pushButton_7->setText(codec->toUnicode("开始实时显示"));
+        //    ui->pushButton_camDetect->setText(codec->toUnicode("开始实时显示"));
         //}
         //sm::CVisionInterface::Ins().StopCapture();
         /////////////////
         QImage image = originalPixmap.toImage().convertToFormat(QImage::Format_RGB888);
         cv::Mat mat(image.height(), image.width(), CV_8UC3, (void*)image.bits(), image.bytesPerLine());
+        cv::cvtColor(mat, mat, cv::COLOR_RGB2BGR);  // QImage是RGB，OpenCV需要BGR
         frame = mat.clone();
         ///////////////
         // 3. 检查图像有效性
         if (frame.empty()) {
             QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("采集的图像为空！"));
+            ui->pushButton_5->setText(codec->toUnicode("生成模板"));
+            ui->pushButton_5->setStyleSheet("");
+            ui->pushButton_5->setEnabled(true);
             return;
         }
 
@@ -780,6 +805,9 @@ void MainWindow::on_pushButton_5_clicked()
         tempInputPath = QCoreApplication::applicationDirPath() + "/temp_input.jpg";
         if (!cv::imwrite(tempInputPath.toLocal8Bit().constData(), frame)) {
             QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("临时图像保存失败！"));
+            ui->pushButton_5->setText(codec->toUnicode("生成模板"));
+            ui->pushButton_5->setStyleSheet("");
+            ui->pushButton_5->setEnabled(true);
             return;
         }
 
@@ -904,12 +932,23 @@ void MainWindow::on_pushButton_5_clicked()
         .arg(result ? codec->toUnicode("成功") : codec->toUnicode("失败"))
         .arg(totalTimeSec, 0, 'f', 2)
         .arg(totalTime));
+
+    // 恢复按钮状态
+    ui->pushButton_5->setText(codec->toUnicode("生成模板"));
+    ui->pushButton_5->setStyleSheet("");
+    ui->pushButton_5->setEnabled(true);
 }
 
 //模板匹配
 void MainWindow::on_pushButton_2_clicked()
 {
     QTextCodec* codec = QTextCodec::codecForName("GBK");
+
+    // 按钮视觉反馈：禁用按钮并改变文字
+    ui->pushButton_2->setEnabled(false);
+    ui->pushButton_2->setText(codec->toUnicode("正在检测..."));
+    ui->pushButton_2->setStyleSheet("background-color: #FFA500; color: white;");  // 橙色背景
+    QCoreApplication::processEvents();  // 立即更新UI
 
   //// 模型只初始化一次 - 现在是类成员变量  第一种方法 暂时屏蔽
   //  if (!modelInitialized) {
@@ -934,6 +973,9 @@ void MainWindow::on_pushButton_2_clicked()
         if (ui->checkBox->isChecked()) {
             if (testImageFiles.isEmpty()) {
                 QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("请先选择连续测试文件夹！"));
+                ui->pushButton_2->setText(codec->toUnicode("检测"));
+                ui->pushButton_2->setStyleSheet("");
+                ui->pushButton_2->setEnabled(true);
                 return;
             }
 
@@ -1060,14 +1102,20 @@ void MainWindow::on_pushButton_2_clicked()
                     // 更新第二视图
                     offset_r += threshold - 6;
                     scene2->clear();
-                    QImage originalImage(filePath);
+                    QFile imgFile2(filePath);
+                    QImage originalImage;
+                    if (imgFile2.open(QIODevice::ReadOnly)) {
+                        originalImage.loadFromData(imgFile2.readAll());
+                        imgFile2.close();
+                    }
                     if (!originalImage.isNull()) {
                         QGraphicsPixmapItem* item = new QGraphicsPixmapItem(QPixmap::fromImage(originalImage));
                         scene2->addItem(item);
                         ui->graphicsView_2->setScene(scene2);
                         ui->graphicsView_2->fitInView(item, Qt::KeepAspectRatio);
                     }
-                    //drawFeatureTrajectory(features, offset_x, offset_y, offset_r, Qt::red);
+                    // 绘制匹配边缘点轮廓
+                    drawFeatureTrajectory(offset_x, offset_y, -offset_r, Qt::red);
 
                 }
                 else {
@@ -1086,14 +1134,21 @@ void MainWindow::on_pushButton_2_clicked()
         else {
             if (originalPixmap2.isNull()) {
                 QMessageBox::warning(this, codec->toUnicode("提示"), codec->toUnicode("请先加载图像！"));
+                ui->pushButton_2->setText(codec->toUnicode("检测"));
+                ui->pushButton_2->setStyleSheet("");
+                ui->pushButton_2->setEnabled(true);
                 return;
             }
 
             // 转换图像为OpenCV格式
             QImage image = originalPixmap2.toImage().convertToFormat(QImage::Format_RGB888);
             cv::Mat mat(image.height(), image.width(), CV_8UC3, (void*)image.bits(), image.bytesPerLine());
+            cv::cvtColor(mat, mat, cv::COLOR_RGB2BGR);  // QImage是RGB，OpenCV需要BGR
             if (mat.empty()) {
                 QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("图像转换失败！"));
+                ui->pushButton_2->setText(codec->toUnicode("检测"));
+                ui->pushButton_2->setStyleSheet("");
+                ui->pushButton_2->setEnabled(true);
                 return;
             }
 
@@ -1175,31 +1230,8 @@ void MainWindow::on_pushButton_2_clicked()
                 ui->tableWidget_results->setItem(row, 4, new QTableWidgetItem(QString::number(similarity * 100.0, 'f', 2)));
                 ui->tableWidget_results->setItem(row, 5, new QTableWidgetItem(QString::number(time_ms, 'f', 3)));
 
-                // 绘制特征点（使用相对路径）
-                /*QVector<QPointF> features;
-                QString filePath = "template_features.txt";
-                QFile file(filePath);
-                if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-                    appendLog("无法打开特征点文件: " + filePath);
-                }
-                else {
-                    QTextStream in(&file);
-                    while (!in.atEnd()) {
-                        double x = 0, y = 0;
-                        in >> x >> y;
-                        if (in.status() == QTextStream::Ok) {
-                            features.append(QPointF(x, y));
-                        }
-                        else {
-                            break;
-                        }
-                    }
-                    file.close();
-                }*/
-                //offset_r -= threshold - 6;
-                //drawFeatureTrajectory(features, offset_x, offset_y, -offset_r, Qt::red);
-
-                //drawFeatureTrajectory(offset_x, offset_y, -offset_r, Qt::red);
+                // 绘制匹配边缘点轮廓
+                drawFeatureTrajectory(offset_x, offset_y, -offset_r, Qt::red);
 
             }
             else {
@@ -1223,17 +1255,21 @@ void MainWindow::on_pushButton_2_clicked()
       //// 2. 停止实时显示和相机流（避免占用资源）
       //if (m_timer && m_timer->isActive()) {
       //    m_timer->stop();
-      //    ui->pushButton_7->setText(codec->toUnicode("开始实时显示"));
+      //    ui->pushButton_camDetect->setText(codec->toUnicode("开始实时显示"));
       //}
       //sm::CVisionInterface::Ins().StopCapture();
       ///////////
       QImage image = originalPixmap.toImage().convertToFormat(QImage::Format_RGB888);
       cv::Mat mat(image.height(), image.width(), CV_8UC3, (void*)image.bits(), image.bytesPerLine());
+      cv::cvtColor(mat, mat, cv::COLOR_RGB2BGR);  // QImage是RGB，OpenCV需要BGR
       frame = mat.clone();
       ///////////////
       // 3. 检查图像有效性
       if (frame.empty()) {
           QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("采集的图像为空！"));
+          ui->pushButton_2->setText(codec->toUnicode("检测"));
+          ui->pushButton_2->setStyleSheet("");
+          ui->pushButton_2->setEnabled(true);
           return;
       }
 
@@ -1241,6 +1277,9 @@ void MainWindow::on_pushButton_2_clicked()
       QString tempInputPath = QCoreApplication::applicationDirPath() + "/temp_input_online.png";
       if (!cv::imwrite(tempInputPath.toLocal8Bit().constData(), frame)) {
           QMessageBox::warning(this, codec->toUnicode("错误"), codec->toUnicode("临时图像保存失败！"));
+          ui->pushButton_2->setText(codec->toUnicode("检测"));
+          ui->pushButton_2->setStyleSheet("");
+          ui->pushButton_2->setEnabled(true);
           return;
       }
       QString outputPath = QCoreApplication::applicationDirPath() + "/match_result_online.jpg";
@@ -1308,8 +1347,8 @@ void MainWindow::on_pushButton_2_clicked()
               .arg(similarity, 0, 'f', 3)
               .arg(time_ms, 0, 'f', 3));
 
-          // 可选：绘制特征轨迹（如果需要，取消注释）
-          // drawFeatureTrajectory(features, offset_x, offset_y, offset_r, Qt::red);
+          // 绘制匹配边缘点轮廓
+          drawFeatureTrajectory(offset_x, offset_y, -offset_r, Qt::red);
       }
       else {
           appendLog(codec->toUnicode("在线测试匹配失败！"));
@@ -1317,7 +1356,11 @@ void MainWindow::on_pushButton_2_clicked()
               codec->toUnicode("未匹配到结果，请检查图像或模型。"));
       }
     }
-    
+
+    // 恢复按钮状态
+    ui->pushButton_2->setText(codec->toUnicode("检测"));
+    ui->pushButton_2->setStyleSheet("");
+    ui->pushButton_2->setEnabled(true);
 }
 
 //选择文件夹
@@ -1734,119 +1777,175 @@ void MainWindow::on_pushButton_11_clicked()
 
     QMessageBox::information(this, codec->toUnicode("重复测试统计结果"), statsMsg);
 }
-void MainWindow::on_loadFeatureButton_clicked()
+// 将无序点按最近邻排序，相近的点连成线段，距离过远或方向突变则断开新起一段
+// 先过滤孤立杂点（周围无近邻的点）
+static QPainterPath buildContourPath(const QVector<QPointF>& input, double maxGap = 2.0)
 {
-    // 假设你要加载的 XML 文件路径为 "path/to/your/xml/file.xml"
-    QString xmlFilePath = QString::fromLocal8Bit("D:/angletemplates/angletemplatespath/matches.xml");
+    QPainterPath path;
+    if (input.isEmpty()) return path;
 
-    // 设置颜色为红色（你可以根据需要修改）
-    QColor color = Qt::red;
+    int n = input.size();
+    double maxDist2 = maxGap * maxGap;
+    double neighborDist2 = (maxGap * 1.5) * (maxGap * 1.5); // 判断杂点的邻域半径
 
-    // 调用 loadAndDrawFeatureTrajectory 函数
-    loadAndDrawFeatureTrajectory(xmlFilePath, color);
+    // 阶段1：过滤孤立杂点——如果一个点在 neighborDist 半径内没有其他点，视为杂点
+    QVector<QPointF> points;
+    points.reserve(n);
+    for (int i = 0; i < n; ++i) {
+        bool hasNeighbor = false;
+        for (int j = 0; j < n; ++j) {
+            if (i == j) continue;
+            double dx = input[j].x() - input[i].x();
+            double dy = input[j].y() - input[i].y();
+            if (dx * dx + dy * dy <= neighborDist2) {
+                hasNeighbor = true;
+                break;
+            }
+        }
+        if (hasNeighbor) points.append(input[i]);
+    }
+
+    n = points.size();
+    if (n == 0) return path;
+
+    QVector<bool> used(n, false);
+
+    // 阶段2：最近邻连线（带方向约束）
+    while (true) {
+        int startIdx = -1;
+        for (int i = 0; i < n; ++i) {
+            if (!used[i]) { startIdx = i; break; }
+        }
+        if (startIdx < 0) break;
+
+        path.moveTo(points[startIdx]);
+        used[startIdx] = true;
+        QPointF last = points[startIdx];
+        QPointF prevDir(0, 0);
+        int segmentLen = 0;
+
+        while (true) {
+            double bestScore = 1e18;
+            int bestIdx = -1;
+            double bestDx = 0, bestDy = 0;
+
+            for (int j = 0; j < n; ++j) {
+                if (used[j]) continue;
+                double dx = points[j].x() - last.x();
+                double dy = points[j].y() - last.y();
+                double d2 = dx * dx + dy * dy;
+                if (d2 > maxDist2 || d2 < 0.01) continue;
+
+                if (segmentLen == 0) {
+                    if (d2 < bestScore) {
+                        bestScore = d2;
+                        bestIdx = j;
+                        bestDx = dx;
+                        bestDy = dy;
+                    }
+                    continue;
+                }
+
+                double prevLen = std::sqrt(prevDir.x() * prevDir.x() + prevDir.y() * prevDir.y());
+                double score = d2;
+                if (prevLen > 0.1) {
+                    double dot = (dx * prevDir.x() + dy * prevDir.y()) / (std::sqrt(d2) * prevLen);
+                    if (dot < -0.3) continue;
+                    if (dot < 0.7) score += maxDist2 * 2;
+                }
+                if (score < bestScore) {
+                    bestScore = score;
+                    bestIdx = j;
+                    bestDx = dx;
+                    bestDy = dy;
+                }
+            }
+            if (bestIdx < 0) break;
+
+            prevDir = QPointF(bestDx, bestDy);
+            path.lineTo(points[bestIdx]);
+            used[bestIdx] = true;
+            last = points[bestIdx];
+            ++segmentLen;
+        }
+        // 只有当终点与起点足够近时才闭合
+        if (segmentLen > 2) {
+            double dx = last.x() - points[startIdx].x();
+            double dy = last.y() - points[startIdx].y();
+            if (dx * dx + dy * dy <= maxDist2) {
+                path.closeSubpath();
+            }
+        }
+    }
+    return path;
 }
+
 void MainWindow::drawFeatureTrajectory(const QVector<QPointF>& features, double match_x, double match_y, double angle_deg, const QColor& color)
 {
-    if (!scene) return;
-
-    double anglerad = angle_deg * M_PI / 180.0; // 注意 M_PI 要 include <cmath>
-    double cos_r = cos(anglerad);
-    double sin_r = sin(anglerad);
-
-    QVector<QPointF> points;
-    for (const auto& feature : features) {
-        double x = feature.x() * cos_r - feature.y() * sin_r + match_x+0.5;
-        double y = feature.x() * sin_r + feature.y() * cos_r + match_y+0.5;
-        points.append(QPointF(x, y));
-    }
-
-    QPen pen(color, 1);
-
-    //// 连线绘制
-    //for (int i = 0; i < points.size() - 1; ++i) {
-    //    scene->addLine(points[i].x(), points[i].y(), points[i + 1].x(), points[i + 1].y(), pen);
-    //}
-    if (points.size() < 3) return; // 少于3个点无法形成轮廓
-
-    double radius = 0.5;
-    // 画点
-    for (const auto& pt : points) {
-        scene2->addEllipse(pt.x() - radius, pt.y() - radius,
-            radius * 2, radius * 2,
-            Qt::NoPen, QBrush(color));
-    }
-}
-void MainWindow::drawFeatureTrajectory1(const QVector<QPointF>& features, double match_x, double match_y, double angle_deg, const QColor& color)
-{
-    if (!scene) return;
+    if (!scene2 || features.isEmpty()) return;
 
     double anglerad = angle_deg * M_PI / 180.0;
     double cos_r = cos(anglerad);
     double sin_r = sin(anglerad);
 
-    QVector<QPointF> points;
-    for (const auto& feature : features) {
-        double x = feature.x() * cos_r - feature.y() * sin_r + match_x;
-        double y = feature.x() * sin_r + feature.y() * cos_r + match_y;
-        points.append(QPointF(x, y));
+    QVector<QPointF> transformed;
+    transformed.reserve(features.size());
+    for (const auto& f : features) {
+        double x = f.x() * cos_r - f.y() * sin_r + match_x + 0.5;
+        double y = f.x() * sin_r + f.y() * cos_r + match_y + 0.5;
+        transformed.append(QPointF(x, y));
     }
 
-    QPen pen(color, 1);
-
-    // 连线绘制（可选）
-    // for (int i = 0; i < points.size() - 1; ++i) {
-    //     QGraphicsLineItem* line = scene->addLine(
-    //         points[i].x(), points[i].y(), 
-    //         points[i + 1].x(), points[i + 1].y(), 
-    //         pen
-    //     );
-    //     trajectoryItems.append(line);
-    // }
-
-    if (points.size() < 3) return;
-
-    double radius = 1;
-    // 画点
-    for (const auto& pt : points) {
-        QGraphicsEllipseItem* ellipse = scene->addEllipse(
-            pt.x() - radius, pt.y() - radius,
-            radius * 2, radius * 2,
-            Qt::NoPen, QBrush(color)
-        );
-        trajectoryItems.append(ellipse);
-    }
+    QPainterPath path = buildContourPath(transformed);
+    QGraphicsPathItem* item = scene2->addPath(path, QPen(color, 1.5));
+    item->setFlag(QGraphicsItem::ItemIsSelectable, false);
+    item->setFlag(QGraphicsItem::ItemIsMovable, false);
 }
-void MainWindow::drawFeatureTrajectory( double match_x, double match_y, double angle_deg, const QColor& color)
+void MainWindow::drawFeatureTrajectory1(const QVector<QPointF>& features, double match_x, double match_y, double angle_deg, const QColor& color)
 {
-    if (!scene) return;
+    if (!scene || features.isEmpty()) return;
 
-    double anglerad = angle_deg * M_PI / 180.0; // 注意 M_PI 要 include <cmath>
+    double anglerad = angle_deg * M_PI / 180.0;
     double cos_r = cos(anglerad);
     double sin_r = sin(anglerad);
 
-    QVector<QPointF> points;
+    QVector<QPointF> transformed;
+    transformed.reserve(features.size());
+    for (const auto& f : features) {
+        double x = f.x() * cos_r - f.y() * sin_r + match_x;
+        double y = f.x() * sin_r + f.y() * cos_r + match_y;
+        transformed.append(QPointF(x, y));
+    }
+
+    QPainterPath path = buildContourPath(transformed);
+    QGraphicsPathItem* item = scene->addPath(path, QPen(color, 1.5));
+    item->setFlag(QGraphicsItem::ItemIsSelectable, false);
+    item->setFlag(QGraphicsItem::ItemIsMovable, false);
+    trajectoryItems.append(item);
+}
+void MainWindow::drawFeatureTrajectory( double match_x, double match_y, double angle_deg, const QColor& color)
+{
+    if (!scene2) return;
+
+    double anglerad = angle_deg * M_PI / 180.0;
+    double cos_r = cos(anglerad);
+    double sin_r = sin(anglerad);
+
     sm::Core* core = sm::Core::get_init();
-    for (const auto& feature : core->temp_features) {
-        double x = feature.x * cos_r - feature.y * sin_r + match_x + 0.5;
-        double y = feature.x * sin_r + feature.y * cos_r + match_y + 0.5;
-        points.append(QPointF(x, y));
+    if (core->features.empty()) return;
+
+    QVector<QPointF> transformed;
+    transformed.reserve(core->features.size());
+    for (const auto& f : core->features) {
+        double x = f.x * cos_r - f.y * sin_r + match_x;
+        double y = f.x * sin_r + f.y * cos_r + match_y;
+        transformed.append(QPointF(x, y));
     }
 
-    QPen pen(color, 1);
-
-    //// 连线绘制
-    //for (int i = 0; i < points.size() - 1; ++i) {
-    //    scene->addLine(points[i].x(), points[i].y(), points[i + 1].x(), points[i + 1].y(), pen);
-    //}
-    if (points.size() < 3) return; // 少于3个点无法形成轮廓
-
-    double radius = 0.5;
-    // 画点
-    for (const auto& pt : points) {
-        scene2->addEllipse(pt.x() - radius, pt.y() - radius,
-            radius * 2, radius * 2,
-            Qt::NoPen, QBrush(color));
-    }
+    QPainterPath path = buildContourPath(transformed);
+    QGraphicsPathItem* item = scene2->addPath(path, QPen(color, 1.5));
+    item->setFlag(QGraphicsItem::ItemIsSelectable, false);
+    item->setFlag(QGraphicsItem::ItemIsMovable, false);
 }
 // 重写事件过滤器
 bool MainWindow::eventFilter(QObject* watched, QEvent* event)
@@ -2006,14 +2105,6 @@ MainWindow::MatchData MainWindow::loadMatchesFromXml(const std::string& filePath
     return matchData; // 返回单个
 }
 
-void MainWindow::loadAndDrawFeatureTrajectory(const QString& xmlFilePath, const QColor& color)
-{
-    std::string path = "D:/mark_window/module/qtgui/src/matches.xml";
-    MatchData matches = loadMatchesFromXml(path);
-
-    // 调用原有的绘制方法
-    //drawFeatureTrajectory(matches.features, matches.match_x, matches.match_y, matches.angle_deg, color);
-}
 void MainWindow::wheelEvent(QWheelEvent* event)
 {
     const double zoomStep = 1.15;
@@ -2105,7 +2196,7 @@ void MainWindow::on_Camera_test()
     if (!scene2) {
         scene2 = new QGraphicsScene(this);
         ui->graphicsView_2->setScene(scene2);
-        ui->graphicsView_2->setDragMode(QGraphicsView::ScrollHandDrag);
+        ui->graphicsView_2->viewport()->setCursor(Qt::ArrowCursor);
         ui->graphicsView_2->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
     }
     else {
@@ -2127,16 +2218,16 @@ void MainWindow::on_Camera_test()
     //    // 确保相机只初始化一次（移到构造函数或其他地方调用一次即可）
     //    // sm::CVisionInterface::Ins().Init();   // 建议放到 MainWindow 构造函数中调用一次
     //    m_timer->start(33);   // 约30帧/秒 (1000/33 ≈ 30)
-    //    ui->pushButton_7->setText(codec->toUnicode("停止实时显示"));
+    //    ui->pushButton_camDetect->setText(codec->toUnicode("停止实时显示"));
     //}
     //else {
     //    m_timer->stop();
-    //    ui->pushButton_7->setText(codec->toUnicode("开始实时显示"));
+    //    ui->pushButton_camDetect->setText(codec->toUnicode("开始实时显示"));
     //}
     if (m_timer->isActive()) {
         // 停止实时显示
         m_timer->stop();
-        ui->pushButton_7->setText(codec->toUnicode("开始实时显示"));
+        ui->pushButton_camDetect->setText(codec->toUnicode("开始实时显示"));
         // 注意：停止定时器后，相机仍然处于抓图状态，但不再采集帧。
         // 如果希望停止相机抓图以释放资源，可以调用 StopCapture()，但这样下次启动时需要重新 StartCapture。
         // 为了下次能快速启动，建议不停止相机抓图，仅停止定时器。
@@ -2148,7 +2239,7 @@ void MainWindow::on_Camera_test()
         sm::CVisionInterface::Ins().StartCapture();   // 关键：确保相机开始抓图
 
         m_timer->start(33);
-        ui->pushButton_7->setText(codec->toUnicode("停止实时显示"));
+        ui->pushButton_camDetect->setText(codec->toUnicode("停止实时显示"));
     }
 }
 void MainWindow::updateFrame()
@@ -2164,7 +2255,7 @@ void MainWindow::updateFrame()
     if (!scene2) {
         scene2 = new QGraphicsScene(this);
         ui->graphicsView_2->setScene(scene2);
-        ui->graphicsView_2->setDragMode(QGraphicsView::ScrollHandDrag);
+        ui->graphicsView_2->viewport()->setCursor(Qt::ArrowCursor);
         ui->graphicsView_2->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
     }
     else {
@@ -2180,12 +2271,48 @@ void MainWindow::updateFrame()
 //相机初始化
 void MainWindow::on_OpenCamera_test()
 {
-    sm::CVisionInterface::Ins().Init();
+    sm::APIErrCode ret = sm::CVisionInterface::Ins().Init();
+    QTextCodec* codec = QTextCodec::codecForName("GBK");
+    if (ret == sm::APIErrCode::SUCCESS) {
+        ui->label_cameraStatus->setText(codec->toUnicode("相机状态: 已连接"));
+        ui->label_cameraStatus->setStyleSheet("color: #00aa00;");
+
+        // 读取当前相机参数并更新UI
+        using namespace sm;
+        CameraID id = CameraID::CAMERA_ID_MAIN;
+        double exposure = CameraManager::GetInstance().GetExposureTime(id);
+        double gain = CameraManager::GetInstance().GetGain(id);
+        if (exposure > 0) ui->spinBox_exposure->setValue(exposure);
+        if (gain > 0) ui->spinBox_gain->setValue(gain);
+
+        appendLog(codec->toUnicode("相机打开成功"));
+    }
+    else {
+        ui->label_cameraStatus->setText(codec->toUnicode("相机状态: 连接失败"));
+        ui->label_cameraStatus->setStyleSheet("color: #cc0000;");
+        appendLog(codec->toUnicode("相机打开失败"));
+    }
 }
 
 void MainWindow::on_CloseCamera_test()
 {
     sm::CVisionInterface::Ins().CloseCamera();
+    QTextCodec* codec = QTextCodec::codecForName("GBK");
+    ui->label_cameraStatus->setText(codec->toUnicode("相机状态: 已关闭"));
+    ui->label_cameraStatus->setStyleSheet("color: #999999;");
+    appendLog(codec->toUnicode("相机关闭"));
+}
+
+void MainWindow::on_spinBox_exposure_valueChanged(double val)
+{
+    using namespace sm;
+    CameraManager::GetInstance().SetExposureTime(CameraID::CAMERA_ID_MAIN, val);
+}
+
+void MainWindow::on_spinBox_gain_valueChanged(double val)
+{
+    using namespace sm;
+    CameraManager::GetInstance().SetGain(CameraID::CAMERA_ID_MAIN, val);
 }
 
 void MainWindow::SearchAndConnectCamera()

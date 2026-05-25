@@ -16,11 +16,11 @@ namespace sm
 	//struct BaslerCamera::BaslerPimple
 	//{
 	//	CameraID id;
-	//	std::string serialNumber; //ĞòÁĞºÅ
-	//	std::string szName; //Ïà»ú×Ô¶¨ÒåÃû³Æ
-	//	void* m_hDevHandle; //Ïà»ú¿ØÖÆ¾ä±ú
+	//	std::string serialNumber; //ï¿½ï¿½ï¿½Ğºï¿½
+	//	std::string szName; //ï¿½ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	//	void* m_hDevHandle; //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¾ï¿½ï¿½
 
-	//	std::atomic <uchar*> data; //Í¼ÏñÊı¾İÖ¸Õë(Ôİ´æ)
+	//	std::atomic <uchar*> data; //Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½(ï¿½İ´ï¿½)
 	//};
 
 	class BaslerCamera : public CCameraBase
@@ -32,12 +32,12 @@ namespace sm
 		struct BaslerPimple
 		{
 			CameraID id;
-			std::string serialNumber; //ĞòÁĞºÅ
-			std::string szName; //Ïà»ú×Ô¶¨ÒåÃû³Æ
-			void* m_hDevHandle; //Ïà»ú¿ØÖÆ¾ä±ú
+			std::string serialNumber; //ï¿½ï¿½ï¿½Ğºï¿½
+			std::string szName; //ï¿½ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+			void* m_hDevHandle; //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¾ï¿½ï¿½
 			CameraConfig camerainfo;
 
-			std::atomic <uchar*> data; //Í¼ÏñÊı¾İÖ¸Õë(Ôİ´æ)
+			std::atomic <uchar*> data; //Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½(ï¿½İ´ï¿½)
 
 			BaslerPimple()
 			{
@@ -50,66 +50,74 @@ namespace sm
 			~BaslerPimple() {};
 		};
 
-		//Ïà»ú³õÊ¼»¯
+		//ï¿½ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½
 		int Init() override;
 
-		//²âÊÔ½Ó¿Ú
+		//ï¿½ï¿½ï¿½Ô½Ó¿ï¿½
 		int CameraTest() override;
 
-		//´ò¿ªÏà»ú
+		//ï¿½ï¿½ï¿½ï¿½ï¿½
 		int OpenCamera();
 
-		//ÉèÖÃPimple»ù±¾²ÎÊı
+		//ï¿½ï¿½ï¿½ï¿½Pimpleï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		//int SetPimpleParameters();
 
-		//ÉèÖÃÏà»úÊôĞÔ²ÎÊı
+		//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô²ï¿½ï¿½ï¿½
 		//int SetParameters() override;
 
-		//¿ªÊ¼È¡Á÷
+		//ï¿½ï¿½Ê¼È¡ï¿½ï¿½
 		//int StartAcquisition();
 
-		//Èí´¥·¢
+		//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		int SoftwareTrigger() override;
 
-		//»Øµ÷º¯Êı
+		//ï¿½Øµï¿½ï¿½ï¿½ï¿½ï¿½
 		//static void __stdcall CallbackStoreImage(unsigned char* pData, MV_FRAME_OUT_INFO_EX* pFrameInfo, void* pUser);
 
-		//µÈÍ¼Ö»ÓĞÈí´¥·¢µÄÊ±ºòÊ¹ÓÃ
+		//ï¿½ï¿½Í¼Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½Ê¹ï¿½ï¿½
 		bool WaitForSingleImageCaptured(int GetImage_time) override;
 
-		//»ñÈ¡Ïà»ú²ÎÊı
+		//ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		int GetCameraParaInt(CameraParameter para);
 
-		//»ñÈ¡Í¼Æ¬Êı¾İ
+		//ï¿½ï¿½È¡Í¼Æ¬ï¿½ï¿½ï¿½ï¿½
 		int GetCameraData(unsigned char* data) override;
 
-		//ÉèÖÃ²¶»ñÍ¼Ïñ²ÎÊı
+		//ï¿½ï¿½ï¿½Ã²ï¿½ï¿½ï¿½Í¼ï¿½ï¿½ï¿½ï¿½ï¿½
 		int SetShootParams();
 
-		//±£´æ×î½üÒ»ÕÅÍ¼Æ¬
+		//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½Í¼Æ¬
 		int SaveImage(ImageType imagetype) override;
 
-		//¹Ø±ÕÏà»ú
+		//ï¿½Ø±ï¿½ï¿½ï¿½ï¿½
 		int CloseDevice() override;
 		
-		//Í£Ö¹ÊµÊ±²É¼¯
+		//Í£Ö¹ÊµÊ±ï¿½É¼ï¿½
 		int StopGrabbing() override;
 
-		//¿ªÊ¼ÊµÊ±²É¼¯
-		int StartGrabbing() override;   // ĞÂÔö
+		//ï¿½ï¿½Ê¼ÊµÊ±ï¿½É¼ï¿½
+		int StartGrabbing() override;
+
+			// è®¾ç½®/è·å–æ›å…‰æ—¶é—´ï¼ˆå¾®ç§’ï¼‰
+			int SetExposureTime(double exposure);
+			double GetExposureTime();
+
+			// è®¾ç½®/è·å–å¢ç›Š
+			int SetGain(double gain);
+			double GetGain();   // ï¿½ï¿½ï¿½ï¿½
 	private:
-		// Á¬Ğø×¥Í¼µÄºóÌ¨Ïß³Ìº¯Êı
+		// ï¿½ï¿½ï¿½ï¿½×¥Í¼ï¿½Äºï¿½Ì¨ï¿½ß³Ìºï¿½ï¿½ï¿½
 		void GrabLoop();
 
-		// Pylon Ïà»ú¶ÔÏó£¨Ê¹ÓÃÖÇÄÜÖ¸Õë±ÜÃâÍ·ÎÄ¼şÒÀÀµ£©
+		// Pylon ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½ï¿½Í·ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		std::unique_ptr<Pylon::CBaslerUsbInstantCamera> m_camera;
 		std::unique_ptr<Pylon::CImageFormatConverter> m_converter;
 		std::unique_ptr<Pylon::CPylonImage> m_pylonImage;
 
-		cv::Mat m_frame;              // ×îĞÂÒ»Ö¡£¨BGR¸ñÊ½£©
-		std::mutex m_frameMutex;      // ±£»¤ m_frame
-		std::thread m_grabThread;     // ºóÌ¨×¥Í¼Ïß³Ì
-		std::atomic<bool> m_grabbing; // ¿ØÖÆ×¥Í¼Ïß³ÌÔËĞĞ
+		cv::Mat m_frame;              // ï¿½ï¿½ï¿½ï¿½Ò»Ö¡ï¿½ï¿½BGRï¿½ï¿½Ê½ï¿½ï¿½
+		std::mutex m_frameMutex;      // ï¿½ï¿½ï¿½ï¿½ m_frame
+		std::thread m_grabThread;     // ï¿½ï¿½Ì¨×¥Í¼ï¿½ß³ï¿½
+		std::atomic<bool> m_grabbing; // ï¿½ï¿½ï¿½ï¿½×¥Í¼ï¿½ß³ï¿½ï¿½ï¿½ï¿½ï¿½
 		//struct BaslerPimple;
 		shared_ptr<BaslerPimple> pBaslerMember;
 	};

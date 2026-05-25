@@ -146,10 +146,15 @@ NCC_MATCH_API bool NCC_PerformMatching(
         float bestAngle;  // 弧度
         double bestScore;
         bool matchSuccess1 = g_matcher->runFullMatchingFromPath(roiImage, edgeXmlPath, bestLoc, bestAngle, bestScore);
+        if (!matchSuccess1) {
+            std::cerr << "NCC_PerformMatching: runFullMatchingFromPath failed" << std::endl;
+            return false;
+        }
         /*if (!g_matcher->matchUsingEdgePointsFromXml(testImage, edgeXmlPath, bestLoc, bestAngle, bestScore)) {
             std::cerr << "匹配失败" << std::endl;
             return false;
         }*/
+        std::cerr << "NCC match result: loc=(" << bestLoc.x << "," << bestLoc.y << ") angle=" << bestAngle << " score=" << bestScore << std::endl;
         auto end = std::chrono::high_resolution_clock::now();
         // 填充结果
         if (roi != nullptr)
@@ -242,6 +247,7 @@ NCC_MATCH_API bool Region_PerformMatching(
         // 修改：传递markType参数到Region_test_subpix
         bool matchSuccess1 = g_matcher->Region_test(roiImage, edgeXmlPath, bestLoc, bestAngle, bestScore, markType);
 
+        std::cerr << "NCC match result: loc=(" << bestLoc.x << "," << bestLoc.y << ") angle=" << bestAngle << " score=" << bestScore << std::endl;
         auto end = std::chrono::high_resolution_clock::now();
         // 填充结果
         if (roi != nullptr)

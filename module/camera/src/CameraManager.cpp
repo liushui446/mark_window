@@ -7,7 +7,6 @@
 #include <opencv2/opencv.hpp>
 using namespace std;
 
-// 全局使用 Pylon 命名空间
 using namespace Pylon;
 using namespace GenApi;
 using namespace cv;
@@ -24,16 +23,14 @@ namespace sm {
 		CameraID id = CameraID::CAMERA_ID_MAIN;
 		pMembers = make_shared<Pimple>();
 		auto cameraPtr = std::make_shared<BaslerCamera>(id);
-		//pMembers->AccessByCameraID.insert(pair<CameraID, CameraPtr>(id, cameraPtr));
 		pMembers->AccessByCameraID.emplace(id, cameraPtr);
 	}
 
 	CameraManager::~CameraManager() {
-		
+
 	}
 
 	int CameraManager::Init() {
-
 		CameraID id = CameraID::CAMERA_ID_MAIN;
 		if (IDtoCamPtr(id) != nullptr) {
 			return IDtoCamPtr(id)->Init();
@@ -45,7 +42,6 @@ namespace sm {
 	}
 
 	int CameraManager::Test(CameraID id) {
-
 		if (IDtoCamPtr(id) != nullptr) {
 			return IDtoCamPtr(id)->CameraTest();
 		}
@@ -85,8 +81,6 @@ namespace sm {
 		}
 	}
 
-
-
 	int CameraManager::GetParaInt(CameraID id, CameraParameter parm) {
 		if (IDtoCamPtr(id) != nullptr)
 		{
@@ -119,67 +113,55 @@ namespace sm {
 
 	int CameraManager::UseCameraDemo()
 	{
-        // 1. 初始化 Pylon 运行时（显式指定 USB 传输层）
-        PylonInitialize();
+		PylonInitialize();
 
-        try {
-            // 2. 获取传输层工厂，优先加载 USB 传输层
-            CTlFactory& tlFactory = CTlFactory::GetInstance();
+		try {
+			CTlFactory& tlFactory = CTlFactory::GetInstance();
 
-            // ========== 关键：只枚举 USB 传输层的设备 ==========
-            ITransportLayer* pUsbTl = tlFactory.CreateTl("BaslerUsb"); // USB 传输层标识
-            if (pUsbTl == nullptr) {
-                cerr << "无法加载 USB 传输层！请检查 pylon SDK 安装是否包含 USB 组件" << endl;
-                PylonTerminate();
-                return -1;
-            }
+			ITransportLayer* pUsbTl = tlFactory.CreateTl("BaslerUsb");
+			if (pUsbTl == nullptr) {
+				cerr << "Cannot create USB transport!" << endl;
+				PylonTerminate();
+				return -1;
+			}
 
-            // 3. 枚举 USB 传输层下的所有相机（确保只找 USB 相机）
-            DeviceInfoList_t usbDevices;
-            pUsbTl->EnumerateDevices(usbDevices);
+			DeviceInfoList_t usbDevices;
+			pUsbTl->EnumerateDevices(usbDevices);
 
-            if (usbDevices.empty()) {
-                cerr << "USB 传输层下未找到任何相机！" << endl;
-                tlFactory.ReleaseTl(pUsbTl); // 释放传输层
-                PylonTerminate();
-                return -1;
-            }
+			if (usbDevices.empty()) {
+				cerr << "No USB camera found!" << endl;
+				tlFactory.ReleaseTl(pUsbTl);
+				PylonTerminate();
+				return -1;
+			}
 
-            // 4. 打印 USB 相机信息（验证识别结果）
-            cout << "找到 " << usbDevices.size() << " 个 USB 相机：" << endl;
-            for (size_t i = 0; i < usbDevices.size(); ++i) {
-                cout << "相机 " << i + 1 << "：" << endl;
-                cout << "  型号：" << usbDevices[i].GetModelName() << endl;
-                cout << "  序列号：" << usbDevices[i].GetSerialNumber() << endl;
-            }
+			cout << "Found " << usbDevices.size() << " USB camera(s)" << endl;
+			for (size_t i = 0; i < usbDevices.size(); ++i) {
+				cout << "  Camera " << i + 1 << ": " << usbDevices[i].GetModelName()
+					<< " S/N: " << usbDevices[i].GetSerialNumber() << endl;
+			}
 
-            // 5. 连接第一个 USB 相机（核心修正：用 USB 传输层的设备创建实例）
-            CInstantCamera camera(tlFactory.CreateDevice(usbDevices[0]));
-            cout << "成功连接 USB 相机：" << camera.GetDeviceInfo().GetModelName() << endl;
+			CInstantCamera camera(tlFactory.CreateDevice(usbDevices[0]));
+			cout << "Connected to: " << camera.GetDeviceInfo().GetModelName() << endl;
 
-            // 6. 打开相机并配置参数（USB 相机需先 Open 再操作参数）
-            camera.Open();
+			camera.Open();
 
-            // ========== 示例：读取宽高 + 设置触发模式（USB 相机适配） ==========
-            INodeMap& nodeMap = camera.GetNodeMap();
-            // 读取宽度
-            CIntegerParameter widthParam(nodeMap, "Width");
-            if (widthParam.IsReadable()) {
-                cout << "图像宽度：" << widthParam.GetValue() << endl;
-            }
-            // 读取高度
-            CIntegerParameter heightParam(nodeMap, "Height");
-            if (heightParam.IsReadable()) {
-                cout << "图像高度：" << heightParam.GetValue() << endl;
-            }
-			//抓取图像
+			INodeMap& nodeMap = camera.GetNodeMap();
+			CIntegerParameter widthParam(nodeMap, "Width");
+			if (widthParam.IsReadable()) {
+				cout << "Width: " << widthParam.GetValue() << endl;
+			}
+			CIntegerParameter heightParam(nodeMap, "Height");
+			if (heightParam.IsReadable()) {
+				cout << "Height: " << heightParam.GetValue() << endl;
+			}
 			camera.StartGrabbing(GrabStrategy_LatestImageOnly);
 			CImageFormatConverter formatConverter;
 			formatConverter.OutputPixelFormat = PixelType_BGR8packed;
 			CPylonImage pylonImage;
 			cv::Mat opencvImage;
 
-			const int framesToGrab = 100;  // 抓取 100 帧
+			const int framesToGrab = 100;
 			for (int i = 0; i < framesToGrab && camera.IsGrabbing(); ++i)
 			{
 				CGrabResultPtr grabResult;
@@ -193,25 +175,23 @@ namespace sm {
 				}
 				else
 				{
-					std::cerr << "抓取失败" << std::endl;
+					std::cerr << "Grab failed" << std::endl;
 				}
 			}
 
-			camera.StopGrabbing();   // 停止抓图
-            // 7. 关闭相机 + 释放传输层
-            camera.Close();
-            tlFactory.ReleaseTl(pUsbTl); // 必须释放 USB 传输层
-        }
-        catch (const GenericException& e) {
-            cerr << "USB 相机操作异常：" << e.GetDescription() << endl;
-            PylonTerminate();
-            return -1;
-        }
+			camera.StopGrabbing();
+			camera.Close();
+			tlFactory.ReleaseTl(pUsbTl);
+		}
+		catch (const GenericException& e) {
+			cerr << "USB camera exception: " << e.GetDescription() << endl;
+			PylonTerminate();
+			return -1;
+		}
 
-        // 8. 释放 Pylon 运行时
-        PylonTerminate();
-        cout << "程序正常退出" << endl;
-        return 0;
+		PylonTerminate();
+		cout << "Camera demo finished" << endl;
+		return 0;
 	}
 
 	int CameraManager::StopGrabbing(CameraID id)
@@ -238,5 +218,37 @@ namespace sm {
 			return cam->CloseDevice();
 		}
 		return -1;
+	}
+
+	int CameraManager::SetExposureTime(CameraID id, double exposure) {
+		auto cam = IDtoCamPtr(id);
+		if (cam) {
+			return cam->SetExposureTime(exposure);
+		}
+		return -1;
+	}
+
+	double CameraManager::GetExposureTime(CameraID id) {
+		auto cam = IDtoCamPtr(id);
+		if (cam) {
+			return cam->GetExposureTime();
+		}
+		return 0.0;
+	}
+
+	int CameraManager::SetGain(CameraID id, double gain) {
+		auto cam = IDtoCamPtr(id);
+		if (cam) {
+			return cam->SetGain(gain);
+		}
+		return -1;
+	}
+
+	double CameraManager::GetGain(CameraID id) {
+		auto cam = IDtoCamPtr(id);
+		if (cam) {
+			return cam->GetGain();
+		}
+		return 0.0;
 	}
 }

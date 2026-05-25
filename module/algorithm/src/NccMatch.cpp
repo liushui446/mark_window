@@ -48,12 +48,10 @@ bool NccMatch::extractEdgePoints(const cv::Mat& grayImage, std::vector<cv::Point
     const double sigmaColor = std::max(15.0, 3.0 * imgStd);
     cv::Mat denoised;
     cv::GaussianBlur(grayImage, denoised, cv::Size(3, 3), 1.0);
-    //cv::bilateralFilter(grayImage, denoised, 7, sigmaColor, 7);
 
     // ---- 自适应 Canny 阈值 ----
     double lowT, highT;
     if (lowContrast) {
-        // 低对比度图：Otsu 与梯度量纲脱节，用经验固定阈值最稳
         lowT = 20.0; highT = 50.0;
     }
     else {
@@ -64,10 +62,6 @@ bool NccMatch::extractEdgePoints(const cv::Mat& grayImage, std::vector<cv::Point
         lowT = 0.4 * otsu;
     }
     cv::Canny(denoised, edges, lowT, highT, 3, /*L2gradient=*/true);
-
-    // 闭运算连接细微断裂
-    //static const cv::Mat k3 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
-    //cv::morphologyEx(edges, edges, cv::MORPH_CLOSE, k3);
 
     lastEdgeImage_ = edges;  // 不需要 clone，下面就不再写 edges
 
@@ -478,13 +472,12 @@ bool NccMatch::buildAngleTemplates(const std::vector<cv::Point2f>& edgePoints,
     for (size_t i = 0; i < edgePoints.size(); ++i) {
         int px = cvRound(edgePoints[i].x - baseBbox_.x);
         int py = cvRound(edgePoints[i].y - baseBbox_.y);
-        if ((unsigned)px < (unsigned)baseW_ && (unsigned)py < (unsigned)baseH_)
+        if ((unsigned)px <= (unsigned)baseW_ && (unsigned)py <= (unsigned)baseH_)
             baseEdgePoints_.emplace_back(px, py);
 
         float sx = subedgePoints[i].x - baseBbox_.x;
         float sy = subedgePoints[i].y - baseBbox_.y;
-        if (sx >= 0 && sx < baseW_ && sy >= 0 && sy < baseH_)
-            baseSubedgePoints_.emplace_back(sx, sy);
+        baseSubedgePoints_.emplace_back(sx, sy);
     }
 
     // 0 层基底
@@ -701,27 +694,20 @@ bool NccMatch::generateTemplateAndSaveEdgePoints(const cv::Mat& grayImage, const
     subedgePoints.reserve(edgePoints.size());
     SubPixelByZernike1(grayImage, edgePoints, subedgePoints);
 
-    // 一次性写入全局 core
+    // 写入全局 core
     sm::Core* core = sm::Core::get_init();
     core->sub_features.clear();
     core->sub_features.reserve(subedgePoints.size());
     for (const auto& p : subedgePoints) {
         core->sub_features.emplace_back(Point_f{ p.x, p.y });
     }
+
     std::vector<cv::Point2f> edgePoints2f;
     edgePoints2f.reserve(edgePoints.size());
     for (const auto& p : edgePoints)
         edgePoints2f.emplace_back(float(p.x), float(p.y));
 
-    // 像素点和亚像素点应当一一对应；若 SubPixelByZernike 实现保证这一点，
-    // edgePoints2f.size() == subedgePoints.size() 自然成立。
-    if (edgePoints2f.size() != subedgePoints.size()) {
-        std::cerr << "edge/subedge size mismatch: "
-            << edgePoints2f.size() << " vs " << subedgePoints.size() << std::endl;
-        return false;
-    }
     return buildAngleTemplates(edgePoints2f, subedgePoints);
-
 }
 
 //bool NccMatch::loadEdgePointsAndGenerateTemplates(const std::string& edgeXmlPath) {
@@ -1476,12 +1462,24 @@ void NccMatch::extractEdgePointsWithNoiseFilter(
         edgeImage, labels, stats, centroids, 8, CV_32S);
     if (numLabels <= 1) return;  // 只有背景
 
-    // 构造保留表 + 总像素数（用于 reserve）
+    // 第一步：找最大连通域面积
+    int maxArea = 0;
+    for (int i = 1; i < numLabels; ++i) {
+        const int area = stats.at<int>(i, cv::CC_STAT_AREA);
+        if (area > maxArea) maxArea = area;
+    }
+    if (maxArea < minArea) return;
+
+    // 第二步：构造保留表
+    // 策略：保留面积 >= minArea 且 >= 最大面积 5% 的连通域
+    // 保留 5% 比例是为了保留目标的内外轮廓（如 box-in-box 的内框）
+    // 而杂点通常只有最大面积的 0.1%~2%
+    const int areaThreshold = std::max(minArea, maxArea / 20);
     std::vector<uchar> keep(numLabels, 0);
     int totalKeptPixels = 0;
     for (int i = 1; i < numLabels; ++i) {
         const int area = stats.at<int>(i, cv::CC_STAT_AREA);
-        if (area >= minArea) {
+        if (area >= areaThreshold) {
             keep[i] = 1;
             totalKeptPixels += area;
         }

@@ -38,9 +38,7 @@ public:
     void SearchAndConnectCamera();
    
 private slots:
-    //void on_actionq_triggered();      // 新建操作槽函数
     void on_actionw_triggered();      // 打开文件操作槽函数
-    void on_loadFeatureButton_clicked();  // 新增按钮点击槽函数
     void on_pushButton_3_clicked();
     void on_pushButton_clicked();  // ← 添加这行
     void on_pushButton_5_clicked();
@@ -61,6 +59,9 @@ private slots:
     void updateFrame();   // 定时采集并刷新画面
 
     void on_pushButton_detailsDontCare_clicked();  // 细节忽略区域按钮
+
+    void on_spinBox_exposure_valueChanged(double val);
+    void on_spinBox_gain_valueChanged(double val);
 private:
     Ui::MainWindow* ui;
     QGraphicsScene* scene = nullptr;
@@ -91,7 +92,6 @@ private:
     void drawFeatureTrajectory(const QVector<QPointF>& features, double match_x, double match_y, double angle_deg, const QColor& color = Qt::red);
     //获取全局的点集
     void MainWindow::drawFeatureTrajectory(double match_x, double match_y, double angle_deg, const QColor& color);
-    void loadAndDrawFeatureTrajectory(const QString& xmlFilePath, const QColor& color);
     QVector<QColor> colorTable = { Qt::red, Qt::green, Qt::blue, Qt::yellow, Qt::magenta };
     QPixmap originalPixmap;  // 原图
     QPixmap binaryPixmap;    // 二值图

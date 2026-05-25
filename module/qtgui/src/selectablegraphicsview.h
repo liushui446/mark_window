@@ -6,6 +6,7 @@
 #include <QMouseEvent>
 #include <QMenu>
 #include <QAction>
+#include <QWheelEvent>
 
 class SelectableGraphicsView : public QGraphicsView
 {
@@ -29,6 +30,7 @@ protected:
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
     void contextMenuEvent(QContextMenuEvent* event) override; // 右键菜单事件
+    void wheelEvent(QWheelEvent* event) override;            // 滚轮缩放
     bool eventFilter(QObject* watched, QEvent* event) override;
 private slots:
     // 菜单动作槽函数

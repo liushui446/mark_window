@@ -71,7 +71,15 @@ namespace sm {
 		virtual int StopGrabbing() = 0;
 
 		virtual int StartGrabbing() = 0;
-	};
+
+			// 设置/获取曝光时间（微秒）
+			virtual int SetExposureTime(double exposure) { return -1; }
+			virtual double GetExposureTime() { return 0.0; }
+
+			// 设置/获取增益
+			virtual int SetGain(double gain) { return -1; }
+			virtual double GetGain() { return 0.0; }
+		};
 
 	typedef shared_ptr<CCameraBase> CameraPtr;
 }

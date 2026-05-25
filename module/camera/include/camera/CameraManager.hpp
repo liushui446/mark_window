@@ -1,9 +1,9 @@
 #ifndef CAMERAMANAGER_H
 #define CAMERAMANAGER_H
 
-//¹ÜÀíµÄÏà»úÊµÀýÍ·ÎÄ¼þ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½Í·ï¿½Ä¼ï¿½
 
-//core¶¨Òå
+//coreï¿½ï¿½ï¿½ï¿½
 #include "camera/CCameraBase.hpp"
 
 namespace sm {
@@ -11,8 +11,8 @@ namespace sm {
 	class Pimple
 	{
 	public:
-		std::vector<CameraPtr> vecCameraList;//´æ·Å²»Í¬Ïà»úÊµÀý
-		std::map<string, CameraID> StringToID;//Áô×ÅÍòÒ»ÓÐÓÃ
+		std::vector<CameraPtr> vecCameraList;//ï¿½ï¿½Å²ï¿½Í¬ï¿½ï¿½ï¿½Êµï¿½ï¿½
+		std::map<string, CameraID> StringToID;//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½
 		std::map<CameraID, CameraPtr> AccessByCameraID;
 
 		//********** Basler *********//
@@ -21,7 +21,7 @@ namespace sm {
 	class SM_EXPORTS CameraManager
 	{
 	public:
-		static CameraManager& GetInstance();//µ¥Àý
+		static CameraManager& GetInstance();//ï¿½ï¿½ï¿½ï¿½
 		CameraManager();
 		~CameraManager();
 
@@ -29,21 +29,21 @@ namespace sm {
 
 		int Test(CameraID id);
 
-		//Èí´¥·¢
+		//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		int SoftWareTrigger(CameraID id);
 
-		//µÈ´ýÒ»ÕÅÍ¼µÄµ½´ï
+		//ï¿½È´ï¿½Ò»ï¿½ï¿½Í¼ï¿½Äµï¿½ï¿½ï¿½
 		bool WaitForGrabOneImageFinish(CameraID id, int Getimagetime);
 
-		//´æÍ¼
+		//ï¿½ï¿½Í¼
 		int SaveImage(ImageType enSaveImageType, CameraID id);
 
-		//»ñÈ¡Ïà»ú²ÎÊý
+		//ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		int GetParaInt(CameraID id, CameraParameter parm);
 
 		int SetShootParams(CameraID id);
 
-		//»ñÈ¡Í¼ÏñÊý¾Ý
+		//ï¿½ï¿½È¡Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		int GetCameraData(CameraID id, unsigned char* data);
 
 		int UseCameraDemo();
@@ -53,7 +53,12 @@ namespace sm {
 		int StartGrabbing(CameraID id);
 
 		int CloseDevice(CameraID id);
-		//CameraID×ªÏà»úÊµÀý¶ÔÏó
+
+		int SetExposureTime(CameraID id, double exposure);
+		double GetExposureTime(CameraID id);
+		int SetGain(CameraID id, double gain);
+		double GetGain(CameraID id);
+		//CameraID×ªï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		inline CameraPtr IDtoCamPtr(CameraID id)
 		{
 			if (pMembers->AccessByCameraID.find(id) == pMembers->AccessByCameraID.end())
@@ -68,7 +73,7 @@ namespace sm {
 
 	private:
 		shared_ptr<Pimple> pMembers;
-		static shared_ptr<CameraManager> pIns;//µ¥Àý
+		static shared_ptr<CameraManager> pIns;//ï¿½ï¿½ï¿½ï¿½
 	};
 
 }

@@ -14,8 +14,15 @@ SelectableGraphicsView::SelectableGraphicsView(QWidget* parent)
     selectionRect(nullptr),
     contextMenu(nullptr)
 {
-    setDragMode(QGraphicsView::ScrollHandDrag);
+    setDragMode(QGraphicsView::NoDrag);
     setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
+    viewport()->setCursor(Qt::ArrowCursor);
+    // 渲染优化：关闭抗锯齿（图片显示不需要），提升缩放流畅度
+    setRenderHint(QPainter::Antialiasing, false);
+    setRenderHint(QPainter::SmoothPixmapTransform, false);
+    setOptimizationFlag(QGraphicsView::DontAdjustForAntialiasing, true);
+    setOptimizationFlag(QGraphicsView::DontSavePainterState, true);
+    setViewportUpdateMode(QGraphicsView::SmartViewportUpdate);
     createContextMenu();
     // 关键：设置视图不接受鼠标事件
     setAttribute(Qt::WA_TransparentForMouseEvents, false);
@@ -125,7 +132,7 @@ void SelectableGraphicsView::mousePressEvent(QMouseEvent* event)
         }
 
         // 框选新矩形
-        if (!isRectValid && dragMode() == QGraphicsView::ScrollHandDrag) {
+        if (!isRectValid) {
             isSelecting = true;
             selectStartPoint = event->pos();
 
@@ -312,4 +319,15 @@ bool SelectableGraphicsView::eventFilter(QObject* watched, QEvent* event)
 {
     // 不拦截任何事件，让父窗口处理
     return false;
+}
+
+void SelectableGraphicsView::wheelEvent(QWheelEvent* event)
+{
+    const double zoomStep = 1.15;
+    if (event->angleDelta().y() > 0) {
+        scale(zoomStep, zoomStep);
+    } else {
+        scale(1.0 / zoomStep, 1.0 / zoomStep);
+    }
+    event->accept();
 }

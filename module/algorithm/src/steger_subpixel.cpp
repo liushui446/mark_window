@@ -286,81 +286,73 @@ int SubPixelByZernike1(const cv::Mat& src,
     const std::vector<cv::Point>& vecFinalKeypoints,
     std::vector<cv::Point2f>& group_pin_tough_corners)
 {
-    constexpr int    nbsize = 5;
-    constexpr int    halfN = (nbsize - 1) / 2;          // = 2
-    constexpr double scaleR = (nbsize - 1) / 2.0;        // = 2.0  ★ 关键：用 (N-1)/2，不是 N/2
-    constexpr double L_MAX = 1.0;                        // |l| 上限：超过 → 拒绝
-    constexpr double M11_MIN = 1.0;                        // |M11| 下限：太小 → 无边
-    constexpr double M00_FLAT_TOL = 1e-3;                  // 平区检测（按你的归一化调）
+    constexpr int    halfN = 2;
+    constexpr double scaleR = 2.0;
+    constexpr double L_MAX = 1.0;
+    constexpr double M11_MIN = 1.0;
 
-    // ---- 1) 轻度高斯模糊，抑制噪声对矩的污染 ----
     cv::Mat smooth;
     cv::GaussianBlur(src, smooth, cv::Size(3, 3), 0.8);
 
     const int W = smooth.cols;
     const int H = smooth.rows;
 
-    group_pin_tough_corners.clear();
     group_pin_tough_corners.resize(vecFinalKeypoints.size());
 
-    // ---- 2) 并行 + 拒绝无效解 ----
-    std::vector<uchar> valid(vecFinalKeypoints.size(), 0);
+    // 预取核数据到连续数组，避免 at<>() 开销
+    const double* k00  = ZERPOLY00.ptr<double>();
+    const double* k11R = ZERPOLY11R.ptr<double>();
+    const double* k11I = ZERPOLY11I.ptr<double>();
+    const double* k20  = ZERPOLY20.ptr<double>();
 
 #pragma omp parallel for schedule(static)
     for (int i = 0; i < (int)vecFinalKeypoints.size(); ++i) {
         const cv::Point& kp = vecFinalKeypoints[i];
 
-        // 边界保护：邻域必须完整落在图像内
-        if (kp.x < halfN || kp.y < halfN ||
-            kp.x >= W - halfN || kp.y >= H - halfN) {
-            group_pin_tough_corners[i] = cv::Point2f(kp.x, kp.y);  // 退化：原点
+        if ((unsigned)(kp.x - halfN) >= (unsigned)(W - 2 * halfN) ||
+            (unsigned)(kp.y - halfN) >= (unsigned)(H - 2 * halfN)) {
+            group_pin_tough_corners[i] = cv::Point2f(kp.x, kp.y);
             continue;
         }
 
-        // 取 5×5 邻域（无 adjustROI 隐患）
-        cv::Mat neibor = smooth(cv::Rect(kp.x - halfN, kp.y - halfN, nbsize, nbsize));
+        // 行指针直接访问 5x5 邻域，一次遍历算 4 个矩
+        const int x0 = kp.x - halfN;
+        const uchar* r0 = smooth.ptr<uchar>(kp.y - 2);
+        const uchar* r1 = smooth.ptr<uchar>(kp.y - 1);
+        const uchar* r2 = smooth.ptr<uchar>(kp.y);
+        const uchar* r3 = smooth.ptr<uchar>(kp.y + 1);
+        const uchar* r4 = smooth.ptr<uchar>(kp.y + 2);
 
         double M00 = 0, M11R = 0, M11I = 0, M20 = 0;
-        CalulateCon(neibor, ZERPOLY00, M00);
-        CalulateCon(neibor, ZERPOLY11R, M11R);
-        CalulateCon(neibor, ZERPOLY11I, M11I);
-        CalulateCon(neibor, ZERPOLY20, M20);
+        int ki = 0;
+        #define DOT5(row) { \
+            M00  += row[x0] * k00[ki]  + row[x0+1] * k00[ki+1]  + row[x0+2] * k00[ki+2]  + row[x0+3] * k00[ki+3]  + row[x0+4] * k00[ki+4]; \
+            M11R += row[x0] * k11R[ki] + row[x0+1] * k11R[ki+1] + row[x0+2] * k11R[ki+2] + row[x0+3] * k11R[ki+3] + row[x0+4] * k11R[ki+4]; \
+            M11I += row[x0] * k11I[ki] + row[x0+1] * k11I[ki+1] + row[x0+2] * k11I[ki+2] + row[x0+3] * k11I[ki+3] + row[x0+4] * k11I[ki+4]; \
+            M20  += row[x0] * k20[ki]  + row[x0+1] * k20[ki+1]  + row[x0+2] * k20[ki+2]  + row[x0+3] * k20[ki+3]  + row[x0+4] * k20[ki+4]; \
+            ki += 5; }
+        DOT5(r0); DOT5(r1); DOT5(r2); DOT5(r3); DOT5(r4);
+        #undef DOT5
 
-        // 边方向
         const double phi = std::atan2(M11I, M11R);
         const double cphi = std::cos(phi);
         const double sphi = std::sin(phi);
-
-        // 旋转后的 M11（取实部即为沿边法向的幅值）
         const double rM11 = cphi * M11R + sphi * M11I;
 
-        // ---- 拒绝无效解：邻域无真实边 ----
         if (std::abs(rM11) < M11_MIN) {
             group_pin_tough_corners[i] = cv::Point2f(kp.x, kp.y);
             continue;
         }
 
-        // 解出归一化距离 l
         const double l = M20 / rM11;
-
-        // ---- 拒绝模型外样本：|l| > 1 表示边不在圆盘内 ----
         if (!std::isfinite(l) || std::abs(l) > L_MAX) {
             group_pin_tough_corners[i] = cv::Point2f(kp.x, kp.y);
             continue;
         }
 
-        // ---- 偏移：注意尺度因子用 (N-1)/2 而非 N/2 ----
-        // y 的正负号取决于 ZERPOLY11I 的定义，下面的 "+sin" 是
-        // 假设 ZERPOLY11I 用图像坐标（y 向下）。若你的多项式是数学
-        // 坐标（y 向上），把 + 改回 -。验证方法：见正文最后一节。
-        const float dx = static_cast<float>(l * scaleR * cphi);
-        const float dy = static_cast<float>(l * scaleR * sphi);
-
         group_pin_tough_corners[i] = cv::Point2f(
-            static_cast<float>(kp.x) + dx,
-            static_cast<float>(kp.y) + dy        // ← 若结果反了改成 -dy
-        );
-        valid[i] = 1;
+            static_cast<float>(kp.x) + static_cast<float>(l * scaleR * cphi),
+            static_cast<float>(kp.y) + static_cast<float>(l * scaleR * sphi));
     }
 
     // ---- 3) 紧凑化：剔除被拒绝的点（可选）----
